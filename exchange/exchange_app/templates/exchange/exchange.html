@@ -1,0 +1,12 @@
+<!-- templates/exchange/exchange.html -->
+{% extends './base.html' %}
+
+{% block content %}
+    <h2>Обмен валют</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Обменять</button>
+    </form>
+    <a href="{% url 'exchange:rates' %}">Назад к курсам</a>
+{% endblock %}
