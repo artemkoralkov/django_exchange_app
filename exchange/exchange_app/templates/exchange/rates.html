@@ -1,0 +1,24 @@
+<!-- templates/exchange/rates.html -->
+{% extends './base.html' %}
+
+{% block content %}
+    <h2>Курсы валют</h2>
+    <table>
+        <tr>
+            <th>Валюта из</th>
+            <th>Валюта в</th>
+            <th>Курс</th>
+            <th>Дата</th>
+        </tr>
+        {% for rate in rates %}
+        <tr>
+            <td>{{ rate.currency_from }}</td>
+            <td>{{ rate.currency_to }}</td>
+            <td>{{ rate.rate }}</td>
+            <td>{{ rate.date }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="{% url 'exchange:exchange_currency' %}">Обменять валюту</a>
+    <a href="{% url 'exchange:logout' %}">Выйти</a>
+{% endblock %}

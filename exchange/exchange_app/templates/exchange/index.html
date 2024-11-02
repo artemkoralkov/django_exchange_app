@@ -1,0 +1,25 @@
+<!-- templates/exchange/rates.html -->
+{% extends './base.html' %}
+
+{% block content %}
+    <header>
+        <h1>Добро пожаловать в Обменник валют</h1>
+        <nav>
+            <ul>
+                <li><a href="{% url 'exchange:index' %}">Главная</a></li>
+                <li><a href="{% url 'exchange:exchange_currency' %}">Обменять валюту</a></li>
+                <li><a href="{% url 'exchange:exchange_history' %}">История обменов</a></li>
+                <li><a href="{% url 'admin:index' %}">Админка</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <h2>Курсы валют</h2>
+        <p>Здесь вы можете обменивать валюту по актуальным курсам.</p>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Обменник валют</p>
+    </footer>
+{% endblock %}

@@ -1,0 +1,26 @@
+<!-- templates/exchange/history.html -->
+{% extends './base.html' %}
+
+{% block content %}
+    <h2>История обменов</h2>
+    <table>
+        <tr>
+            <th>Дата</th>
+            <th>Валюта из</th>
+            <th>Валюта в</th>
+            <th>Сумма</th>
+            <th>Обменянная сумма</th>
+        </tr>
+        {% for transaction in transactions %}
+        <tr>
+            <td>{{ transaction.date }}</td>
+            <td>{{ transaction.currency_from }}</td>
+            <td>{{ transaction.currency_to }}</td>
+            <td>{{ transaction.amount }}</td>
+            <td>{{ transaction.exchanged_amount }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="{% url 'exchange:rates' %}">Назад к курсам</a>
+{% endblock %}
+
