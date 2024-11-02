@@ -1,7 +1,9 @@
 # exchange/urls.py
 from django.urls import path
 from .views import login_view, logout_view, rates_view, exchange_view, transaction_history_view, index
-app_name = 'exchange'
+
+app_name = 'exchange_app'
+
 urlpatterns = [
     path('', index, name='index'),
     path('accounts/login/', login_view, name='login'),
