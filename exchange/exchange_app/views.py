@@ -2,6 +2,8 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+
 from .models import ExchangeRate, ExchangeTransaction
 from .forms import ExchangeForm
 from django.contrib import messages
@@ -43,21 +45,46 @@ def exchange_view(request):
             currency_from = form.cleaned_data['currency_from']
             currency_to = form.cleaned_data['currency_to']
             amount = form.cleaned_data['amount']
+            today = timezone.now().date()
 
-            try:
-                rate = ExchangeRate.objects.get(currency_from=currency_from, currency_to=currency_to)
-                exchanged_amount = amount * rate.rate
-                ExchangeTransaction.objects.create(
-                    operator=request.user,
-                    currency_from=currency_from,
-                    currency_to=currency_to,
-                    amount=amount,
-                    exchanged_amount=exchanged_amount
-                )
-                messages.success(request, f"Вы обменяли {amount} {currency_from} на {exchanged_amount} {currency_to}.")
-                return redirect('exchange:rates')
-            except ExchangeRate.DoesNotExist:
-                messages.error(request, "Курс обмена не найден.")
+            # Ищем последний курс для выбранных валют
+            exchange_rate = ExchangeRate.objects.filter(
+                currency_from=currency_from,
+                currency_to=currency_to,
+                date__lte=today
+            ).order_by('-date').first()
+
+            if exchange_rate:
+                # Прямой курс найден
+                exchanged_amount = round(amount * exchange_rate.rate, 2)
+            else:
+                # Пробуем найти обратный курс
+                reverse_rate = ExchangeRate.objects.filter(
+                    currency_from=currency_to,
+                    currency_to=currency_from,
+                    date__lte=today
+                ).order_by('-date').first()
+
+                if reverse_rate:
+                    # Обратный курс найден
+                    exchanged_amount = round(amount / reverse_rate.rate, 2)
+                else:
+                    # Курс не найден
+                    messages.error(request, "Курс обмена не найден.")
+                    return redirect('exchange:exchange_currency')
+
+            # Создание записи о транзакции
+            ExchangeTransaction.objects.create(
+                operator=request.user,
+                currency_from=currency_from,
+                currency_to=currency_to,
+                amount=amount,
+                exchanged_amount=exchanged_amount
+            )
+
+            # Уведомление об успешном обмене
+            messages.success(request, f"Вы обменяли {amount} {currency_from} на {exchanged_amount} {currency_to}.")
+            return redirect('exchange:rates')
     else:
         form = ExchangeForm()
 

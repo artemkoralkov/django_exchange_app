@@ -4,8 +4,8 @@ from .models import ExchangeRate
 
 
 class ExchangeForm(forms.Form):
-    currency_from = forms.ChoiceField(choices=[], label='Валюта из:')
-    currency_to = forms.ChoiceField(choices=[], label='Валюта в:')
+    currency_from = forms.ChoiceField(choices=[], label='Продаю:')
+    currency_to = forms.ChoiceField(choices=[], label='Покупаю:')
     amount = forms.DecimalField(decimal_places=2, label='Количество:', min_value=0.01)
 
     def __init__(self, *args, **kwargs):
@@ -31,9 +31,10 @@ class ExchangeForm(forms.Form):
         currency_to = cleaned_data.get('currency_to')
 
         if currency_from and currency_to and currency_from == currency_to:
-            raise forms.ValidationError("Валюты 'из' и 'в' не могут быть одинаковыми.")
+            raise forms.ValidationError("Невозможно провести операцию: валюты одинаковы")
 
         # Проверяем, существуют ли пары обмена для выбранных валют
         if currency_from and currency_to:
-            if not ExchangeRate.objects.filter(currency_from=currency_from, currency_to=currency_to).exists():
+            if (not ExchangeRate.objects.filter(currency_from=currency_from, currency_to=currency_to).exists() and
+                    not ExchangeRate.objects.filter(currency_from=currency_to, currency_to=currency_from).exists()):
                 raise forms.ValidationError("Нет доступного курса обмена для данной пары валют.")
