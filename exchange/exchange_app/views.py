@@ -39,6 +39,9 @@ def rates_view(request):
 
 @login_required(login_url='/exchange/accounts/login/')
 def exchange_view(request):
+    if request.user.is_staff:
+        messages.error(request, "Только операторы могут обменивать валюту.")
+        return redirect('exchange:rates')
     if request.method == 'POST':
         form = ExchangeForm(request.POST)
         if form.is_valid():
