@@ -45,3 +45,25 @@ button {
 button:hover {
     background-color: #0056b3;
 }
+
+/* styles.css */
+.messages {
+    list-style: none;
+    padding: 0;
+}
+
+.messages li {
+    margin: 5px 0;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.messages .success {
+    background-color: #dff0d8; /* Зеленый фон для успешных сообщений */
+    color: #3c763d; /* Темно-зеленый текст */
+}
+
+.messages .error {
+    background-color: #f2dede; /* Красный фон для ошибок */
+    color: #a94442; /* Темно-красный текст */
+}

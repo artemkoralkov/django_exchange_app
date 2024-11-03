@@ -3,10 +3,17 @@
 
 {% block content %}
     <h2>Курсы валют</h2>
+  {% if messages %}
+        <ul class="messages">
+            {% for message in messages %}
+                <li {% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
     <table>
         <tr>
-            <th>Валюта из</th>
-            <th>Валюта в</th>
+            <th>Продажа</th>
+            <th>Покупка</th>
             <th>Курс</th>
             <th>Дата</th>
         </tr>
