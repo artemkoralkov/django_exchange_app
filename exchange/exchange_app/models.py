@@ -7,7 +7,7 @@ class ExchangeRate(models.Model):
     currency_from = models.CharField(max_length=3)
     currency_to = models.CharField(max_length=3)
     rate = models.DecimalField(max_digits=10, decimal_places=4)
-    date = models.DateField(auto_now_add=True)
+    date = models.DateField()
 
     class Meta:
         verbose_name = "Курс обмена"
