@@ -12,7 +12,8 @@ from django.db import connection
 import requests
 
 # from .models import ExchangeRate, ExchangeTransaction
-from .forms import ExchangeForm, AddExchangeRateForm, AddExchangeRateFromAPIForm, AddCurrencyToCashForm
+from .forms import ExchangeForm, AddExchangeRateForm, AddExchangeRateFromAPIForm, AddCurrencyToCashForm, \
+    UserRegisterForm
 
 
 def index(request):
@@ -271,13 +272,14 @@ def exchange_view(request):
                     currency_to_id, amount, exchanged_amount, change_in_base,  transaction_date) VALUES (%s, %s, %s, 
                     %s, %s, %s, TO_DATE(%s, 'YYYY-MM-DD'))
                     """,
-                   [request.user.id, currency_from_id, currency_to_id, amount,
-                    exchanged_amount, change_in_base, today.strftime('%Y-%m-%d')])
+                                   [request.user.id, currency_from_id, currency_to_id, amount,
+                                    exchanged_amount, change_in_base, today.strftime('%Y-%m-%d')])
 
                 # Уведомление об успешном обмене
                 change_string = f"Сдача: {change_in_base:.2f} в базовой валюте." if change_in_base != 0 else ''
-                messages.success(request, f"Вы обменяли {amount} {currency_from} на {exchanged_amount:.2f} {currency_to}. "
-                                          + change_string)
+                messages.success(request,
+                                 f"Вы обменяли {amount} {currency_from} на {exchanged_amount:.2f} {currency_to}. "
+                                 + change_string)
                 return redirect('exchange:rates')
             else:
                 messages.error(request, "Курс обмена не найден.")
@@ -346,3 +348,15 @@ def add_currency_to_cash(request):
         form = AddCurrencyToCashForm()
 
     return render(request, 'exchange/add_currency_to_cash.html', {'form': form})
+
+
+def register(request):
+    if request.method == 'POST':
+        form = UserRegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect('exchange:index')
+    else:
+        form = UserRegisterForm()
+    return render(request, 'exchange/register.html', {'form': form})

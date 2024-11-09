@@ -1,6 +1,8 @@
 # exchange/forms.py
 import requests
 from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.utils import timezone
@@ -69,3 +71,10 @@ class AddCurrencyToCashForm(forms.Form):
     currency_name = forms.ChoiceField(choices=currency_choices, label="Выберите валюту")
     amount_in_cash = forms.IntegerField(initial=0, max_value=10000000, required=False,
                                         label='Количество валюты для пополнения')
+
+
+class UserRegisterForm(UserCreationForm):
+
+    class Meta:
+        model = User
+        fields = ['username', 'password1', 'password2']
