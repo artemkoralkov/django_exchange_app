@@ -95,8 +95,10 @@ def add_exchange_rate(request):
                     return redirect('exchange:add_exchange_rate')
             else:
                 rate_to_base = form.cleaned_data['rate_to_base']
+            if not rate_to_base:
+                messages.error(request, "Введите курс валюты или добавьте его из API.")
+                return redirect('exchange:add_exchange_rate')
             with connection.cursor() as cursor:
-
                 cursor.execute("""
                         INSERT INTO exchange_rates (currency_id, rate_to_base, rate_date)
                         VALUES (%s, %s, TO_DATE(%s, 'YYYY-MM-DD'))

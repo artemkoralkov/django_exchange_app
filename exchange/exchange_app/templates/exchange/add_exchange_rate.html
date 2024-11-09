@@ -19,21 +19,7 @@
     {% endif %}
 {% endblock %}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-    const useApiCheckbox = document.getElementById('use_api');
-    const rateToBaseInput = document.getElementById('id_rate_to_base');
-    const rateDateInput = document.getElementById('id_rate_date');
-
-    function toggleFields() {
-        const isApiSelected = useApiCheckbox.checked;
-        rateToBaseInput.disabled = isApiSelected;
-        rateDateInput.disabled = isApiSelected;
-    }
-
-    // Добавляем обработчик событий на изменение состояния чекбокса
-    useApiCheckbox.addEventListener('change', toggleFields);
-
-    // Инициализируем поля при загрузке страницы
-    toggleFields();
+    document.addEventListener("DOMContentLoaded", (event) => {
+  console.log("DOM fully loaded and parsed");
 });
 </script>

@@ -42,8 +42,8 @@ class ExchangeForm(forms.Form):
 class AddExchangeRateForm(forms.Form):
     currency = forms.ChoiceField(choices=[], required=True, label='Валюта')
     use_api = forms.BooleanField(required=False, label="Получить курс из API")
-    rate_to_base = forms.DecimalField(max_digits=10, decimal_places=4, required=True, label='Курс к базовой валюте')
-    rate_date = forms.DateField(required=True, initial=timezone.now().date(),
+    rate_to_base = forms.DecimalField(max_digits=10, required=False, decimal_places=4, label='Курс к базовой валюте')
+    rate_date = forms.DateField(initial=timezone.now().date(), required=False,
                                 widget=forms.SelectDateWidget(years=range(2000, 2050)), label='Дата курса')
 
     def __init__(self, *args, **kwargs):
@@ -77,4 +77,3 @@ class UserRegisterForm(UserCreationForm):
 class AddCurrencyForm(forms.Form):
     currency_name = forms.CharField(max_length=50, label='Название валюты')
     amount_in_cash = forms.IntegerField(max_value=999999, label='Начальный баланс', min_value=0)
-
