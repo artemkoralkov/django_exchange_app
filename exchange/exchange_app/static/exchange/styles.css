@@ -67,3 +67,45 @@ button:hover {
     background-color: #f2dede; /* Красный фон для ошибок */
     color: #a94442; /* Темно-красный текст */
 }
+header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #ddd;
+}
+
+.navbar {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    position: relative;
+}
+
+/* Стили для навигационного меню */
+.nav-links ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-links ul li {
+    display: inline;
+    margin-right: 15px;
+}
+
+.nav-links ul li a {
+    text-decoration: none;
+    color: #333;
+}
+
+/* Стили для кнопок авторизации */
+.auth-links {
+    position: absolute;
+    right: 20px;
+    top: 10px;
+}
+
+.auth-links a {
+    text-decoration: none;
+    color: #007bff;
+    font-weight: bold;
+    margin-left: 15px;
+}

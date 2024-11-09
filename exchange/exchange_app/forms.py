@@ -1,27 +1,27 @@
 # exchange/forms.py
+import requests
 from django import forms
-from .models import ExchangeRate
+from django.core.exceptions import ValidationError
+from django.db import connection
+from django.utils import timezone
+
+
+# from .models import ExchangeRate
 
 
 class ExchangeForm(forms.Form):
     currency_from = forms.ChoiceField(choices=[], label='Продаю:')
     currency_to = forms.ChoiceField(choices=[], label='Покупаю:')
-    amount = forms.DecimalField(decimal_places=2, label='Количество:', min_value=0.01)
+    amount = forms.DecimalField(decimal_places=2, label='Количество:', min_value=0.01, required=True)
+    amount_to_get = forms.IntegerField(label='Укажите сколько хотите получить,'
+                                             ' если оставить пустым обменяется вся валюта', required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # Получаем все доступные пары валют
-        rates = ExchangeRate.objects.all()
-        currencies = set()
-
-        # Добавляем валюты, которые имеют пары
-        for rate in rates:
-            currencies.add(rate.currency_from)
-            currencies.add(rate.currency_to)
-
-        # Преобразуем множество в список и создаем выбор валют
-        currency_choices = [(currency, currency) for currency in currencies]
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT currency_id, currency_name FROM cash_reserves")
+            currency_choices = cursor.fetchall()
+        # Преобразуем множество валют в список и создаем выбор валют
         self.fields['currency_from'].choices = currency_choices
         self.fields['currency_to'].choices = currency_choices
 
@@ -30,11 +30,42 @@ class ExchangeForm(forms.Form):
         currency_from = cleaned_data.get('currency_from')
         currency_to = cleaned_data.get('currency_to')
 
+        # Проверяем, что валюты не одинаковые
         if currency_from and currency_to and currency_from == currency_to:
-            raise forms.ValidationError("Невозможно провести операцию: валюты одинаковы")
+            raise ValidationError("Невозможно провести операцию: валюты одинаковы")
 
-        # Проверяем, существуют ли пары обмена для выбранных валют
-        if currency_from and currency_to:
-            if (not ExchangeRate.objects.filter(currency_from=currency_from, currency_to=currency_to).exists() and
-                    not ExchangeRate.objects.filter(currency_from=currency_to, currency_to=currency_from).exists()):
-                raise forms.ValidationError("Нет доступного курса обмена для данной пары валют.")
+        return cleaned_data
+
+
+class AddExchangeRateForm(forms.Form):
+    currency_name = forms.CharField(max_length=30, required=True, label='Валюта')
+    rate_to_base = forms.DecimalField(max_digits=10, decimal_places=4, required=True, label='Курс к базовой валюте')
+    amount_in_cash = forms.IntegerField(initial=0, max_value=10000000, required=False,
+                                        label='Количество валюты для пополнения')
+    rate_date = forms.DateField(required=True, initial=timezone.now().date(),
+                                widget=forms.SelectDateWidget(years=range(2000, 2050)), label='Дата курса')
+
+
+class AddExchangeRateFromAPIForm(forms.Form):
+    currencies_from_api = [(i['Cur_ID'], requests.get(f'https://api.nbrb.by/exrates/currencies/{i['Cur_ID']}')
+                            .json()['Cur_Name']) for i in
+                           requests.get('https://api.nbrb.by/exrates/rates?periodicity=0')
+                           .json()]
+
+    currency_name = forms.ChoiceField(
+        choices=currencies_from_api,
+        label="Выберите валюту для добавления из API"
+    )
+    amount_in_cash = forms.IntegerField(initial=0, max_value=10000000, required=False,
+                                        label='Количество валюты для пополнения')
+
+
+class AddCurrencyToCashForm(forms.Form):
+    # Получаем список валют из таблицы cash_reserves
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT currency_name FROM cash_reserves")
+        currencies = cursor.fetchall()
+        currency_choices = [(currency[0], currency[0]) for currency in currencies]
+    currency_name = forms.ChoiceField(choices=currency_choices, label="Выберите валюту")
+    amount_in_cash = forms.IntegerField(initial=0, max_value=10000000, required=False,
+                                        label='Количество валюты для пополнения')

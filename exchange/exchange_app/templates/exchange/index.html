@@ -6,16 +6,23 @@
         <h1>Добро пожаловать в Обменник валют</h1>
         <nav>
             <ul>
-                <li><a href="{% url 'exchange:index' %}">Главная</a></li>
-                <li><a href="{% url 'exchange:exchange_currency' %}">Обменять валюту</a></li>
-                <li><a href="{% url 'exchange:exchange_history' %}">История обменов</a></li>
-                <li><a href="{% url 'admin:index' %}">Админка</a></li>
+                {% if user.is_superuser %}
+                    <li><a href="{% url 'exchange:add_exchange_rate' %}">Добавить обменный курс</a></li>
+                    <li><a href="{% url 'exchange:add_exchange_rate_from_api' %}">Добавить обменный курс из API Нацбанка</a></li>
+                     <li><a href="{% url 'exchange:add_currency_to_cash' %}">Добавить валюту в кассу</a></li>
+                {% endif %}
+                {% if user.is_authenticated %}
+                    {% if not user.is_superuser %}
+                        <li><a href="{% url 'exchange:exchange_currency' %}">Обменять валюту</a></li>
+                    {% endif %}
+                    <li><a href="{% url 'exchange:exchange_history' %}">История обменов</a></li>
+                {% endif %}
+
             </ul>
         </nav>
     </header>
 
     <main>
-        <h2>Курсы валют</h2>
         <p>Здесь вы можете обменивать валюту по актуальным курсам.</p>
     </main>
 
