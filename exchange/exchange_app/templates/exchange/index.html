@@ -8,10 +8,10 @@
             <ul>
                 {% if user.is_superuser %}
                     <li><a href="{% url 'exchange:add_exchange_rate' %}">Добавить обменный курс</a></li>
-                    <li><a href="{% url 'exchange:add_exchange_rate_from_api' %}">Добавить обменный курс из API Нацбанка</a></li>
-                     <li><a href="{% url 'exchange:add_currency_to_cash' %}">Добавить валюту в кассу</a></li>
+                    <li><a href="{% url 'exchange:cash_reserves' %}">Список валют</a></li>
                 {% endif %}
                 {% if user.is_authenticated %}
+                <li><a href="{% url 'exchange:rates' %}">Курсы валют</a></li>
                     {% if not user.is_superuser %}
                         <li><a href="{% url 'exchange:exchange_currency' %}">Обменять валюту</a></li>
                     {% endif %}

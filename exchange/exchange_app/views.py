@@ -1,29 +1,23 @@
 # exchange/views.py
 from decimal import Decimal
 
-from django.core.exceptions import PermissionDenied
-from django.http import HttpResponseForbidden
-from django.shortcuts import render, redirect
+import requests
+from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.utils import timezone
-from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db import connection
-import requests
+from django.shortcuts import render, redirect
+from django.utils import timezone
 
-# from .models import ExchangeRate, ExchangeTransaction
-from .forms import ExchangeForm, AddExchangeRateForm, AddExchangeRateFromAPIForm, AddCurrencyToCashForm, \
-    UserRegisterForm
+from .utils import find_currency_id_by_name
+
+from .forms import ExchangeForm, AddExchangeRateForm, AddCurrencyToCashForm, \
+    UserRegisterForm, AddCurrencyForm
 
 
 def index(request):
     return render(request, 'exchange/index.html')
-
-
-def test(request):
-    with connection.cursor() as cursor:
-        a = cursor.execute('select currency_name, currency_id from cash_reserves').fetchall()
-    return render(request, 'exchange/test.html', {'t': a})
 
 
 def login_view(request):
@@ -42,18 +36,6 @@ def login_view(request):
 def logout_view(request):
     logout(request)
     return redirect('exchange:login')
-
-
-@login_required(login_url='/exchange/accounts/login/')
-def delete_rate(request, rate_id):
-    # Проверяем права администратора
-    if not request.user.is_superuser:
-        return HttpResponseForbidden("Access denied.")
-
-    with connection.cursor() as cursor:
-        cursor.execute("DELETE FROM exchange_rates WHERE rate_id = %s", [rate_id])
-
-    return redirect('exchange:rates')
 
 
 @login_required(login_url='/exchange/accounts/login/')
@@ -83,43 +65,42 @@ def rates_view(request):
 
 @user_passes_test(lambda u: u.is_superuser)
 def add_exchange_rate(request):
-    # Проверяем, является ли пользователь администратором
-    if not request.user.is_superuser:
-        raise PermissionDenied("You are not allowed to perform this action.")
     if request.method == 'POST':
         form = AddExchangeRateForm(request.POST)
         if form.is_valid():
-            currency_name = form.cleaned_data['currency_name']
-            rate_to_base = form.cleaned_data['rate_to_base']
+            currency_id, currency_name = form.cleaned_data['currency'].split(':')
             rate_date = form.cleaned_data['rate_date'].strftime('%Y-%m-%d')
-            amount_in_cash = form.cleaned_data['amount_in_cash']
-            # Создаем запись в базе данных с использованием SQL
-            with connection.cursor() as cursor:
-                # Получаем currency_id из cash_reserves
-                cursor.execute("SELECT currency_id FROM cash_reserves WHERE currency_name = %s", [currency_name])
-                currency_record = cursor.fetchone()
-                if currency_record:
-                    currency_id = currency_record[0]
-                    cursor.execute("""
-                            INSERT INTO exchange_rates (currency_id, rate_to_base, rate_date)
-                            VALUES (%s, %s, TO_DATE(%s, 'YYYY-MM-DD'))
-                        """, [currency_id, rate_to_base, rate_date])
-                    cursor.execute("""
-                                UPDATE cash_reserves
-                                SET amount_in_cash = amount_in_cash + %s
-                                WHERE currency_id = %s
-                            """, [amount_in_cash, currency_id])
+            use_api = form.cleaned_data['use_api']
+            if use_api:
+                rates = (requests.get('https://api.nbrb.by/exrates/rates?periodicity=0').json()
+                         + requests.get('https://api.nbrb.by/exrates/rates?periodicity=1').json())
+                currency_id_from_api = find_currency_id_by_name(rates, currency_name)
+
+                if not currency_id_from_api:
+                    messages.error(request, "Такой валюты нет в API")
+                    return redirect('exchange:add_exchange_rate')
+
+                response = requests.get(f'https://api.nbrb.by/exrates/rates/{currency_id_from_api}')
+
+                if response.status_code == 200:
+                    rate_to_base = response.json().get("Cur_OfficialRate")
+                    cur_scale = response.json().get("Cur_Scale")
+                    rate_date = timezone.now().date().strftime('%Y-%m-%d')
+                    rate_to_base = Decimal(rate_to_base / cur_scale).quantize(Decimal('1.000'))
+                    if not rate_to_base:
+                        messages.error(request, "Не удалось получить курс из API.")
+                        return redirect('exchange:add_exchange_rate')
                 else:
-                    cursor.execute("""
-                                INSERT INTO cash_reserves (currency_name, amount_in_cash)
-                                VALUES (%s, %s)
-                            """, [currency_name, amount_in_cash])
-                    cursor.execute("SELECT currency_id FROM cash_reserves WHERE currency_name = %s", [currency_name])
-                    new_currency_id = cursor.fetchone()[0]
-                    cursor.execute("""
-                            INSERT INTO exchange_rates (currency_id, rate_to_base, rate_date)
-                            VALUES (%s, %s, TO_DATE(%s, 'YYYY-MM-DD'))
-                        """, [new_currency_id, rate_to_base, rate_date])
+                    messages.error(request, "Ошибка при запросе к API.")
+                    return redirect('exchange:add_exchange_rate')
+            else:
+                rate_to_base = form.cleaned_data['rate_to_base']
+            with connection.cursor() as cursor:
+
+                cursor.execute("""
+                        INSERT INTO exchange_rates (currency_id, rate_to_base, rate_date)
+                        VALUES (%s, %s, TO_DATE(%s, 'YYYY-MM-DD'))
+                    """, [currency_id, rate_to_base, rate_date])
 
             messages.success(request, f"Курс для {currency_name} успешно добавлен!")
             return redirect('exchange:rates')  # или на нужную вам страницу
@@ -129,57 +110,6 @@ def add_exchange_rate(request):
         form = AddExchangeRateForm()
 
     return render(request, 'exchange/add_exchange_rate.html', {'form': form})
-
-
-@user_passes_test(lambda u: u.is_superuser)
-def add_exchange_rate_from_api(request):
-    if request.method == 'POST':
-        form = AddExchangeRateFromAPIForm(request.POST)
-        if form.is_valid():
-            currency_name = form.cleaned_data['currency_name']
-            amount_in_cash = form.cleaned_data['amount_in_cash']
-            currency_from_api = requests.get(f'https://api.nbrb.by/exrates/rates/{currency_name}').json()
-            rate_to_base = (Decimal(str(currency_from_api['Cur_OfficialRate'] / currency_from_api['Cur_Scale']))
-                            .quantize(Decimal('1.000')))
-            currency_name = requests.get(f'https://api.nbrb.by/exrates/currencies/{currency_name}').json()['Cur_Name']
-            if rate_to_base is None:
-                messages.error(request, f"Не удалось загрузить курс для {currency_name} через API.")
-                return render(request, 'exchange/add_exchange_rate_from_api.html', {'form': form})
-
-            # Обновляем или добавляем курс в базу данных
-            with connection.cursor() as cursor:
-                # Получаем currency_id из cash_reserves
-                cursor.execute("SELECT currency_id FROM cash_reserves WHERE currency_name = %s", [currency_name])
-                currency_record = cursor.fetchone()
-                if currency_record:
-                    currency_id = currency_record[0]
-                    cursor.execute("""
-                                       INSERT INTO exchange_rates (currency_id, rate_to_base)
-                                       VALUES (%s, %s)
-                                   """, [currency_id, rate_to_base])
-                    cursor.execute("""
-                                           UPDATE cash_reserves
-                                           SET amount_in_cash = amount_in_cash + %s
-                                           WHERE currency_id = %s
-                                       """, [amount_in_cash, currency_id])
-                else:
-                    cursor.execute("""
-                                           INSERT INTO cash_reserves (currency_name, amount_in_cash)
-                                           VALUES (%s, %s)
-                                       """, [currency_name, amount_in_cash])
-                    cursor.execute("SELECT currency_id FROM cash_reserves WHERE currency_name = %s", [currency_name])
-                    new_currency_id = cursor.fetchone()[0]
-                    cursor.execute("""
-                                       INSERT INTO exchange_rates (currency_id, rate_to_base)
-                                       VALUES (%s, %s)
-                                   """, [new_currency_id, rate_to_base])
-
-            messages.success(request, f"Курс для {currency_name} успешно добавлен/обновлен.")
-            return redirect('exchange:rates')
-    else:
-        form = AddExchangeRateFromAPIForm()
-
-    return render(request, 'exchange/add_exchange_rate_from_api.html', {'form': form})
 
 
 @login_required(login_url='/exchange/accounts/login/')
@@ -260,7 +190,8 @@ def exchange_view(request):
                     # Проверка наличия достаточных средств в кассе
                     if exchanged_amount > available_cash and currency_from_id != '1':
                         messages.error(request,
-                                       f"Недостаточно средств в кассе для обмена на {currency_to}. Доступно: {available_cash}.")
+                                       f"Недостаточно средств в кассе для обмена на {currency_to}."
+                                       f"Доступно: {available_cash}.")
                         return redirect('exchange:exchange_currency')
 
                 # Запись транзакции
@@ -350,7 +281,7 @@ def add_currency_to_cash(request):
     return render(request, 'exchange/add_currency_to_cash.html', {'form': form})
 
 
-def register(request):
+def register_view(request):
     if request.method == 'POST':
         form = UserRegisterForm(request.POST)
         if form.is_valid():
@@ -360,3 +291,78 @@ def register(request):
     else:
         form = UserRegisterForm()
     return render(request, 'exchange/register.html', {'form': form})
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def cash_reserves_view(request):
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT currency_id, currency_name, amount_in_cash FROM cash_reserves")
+        currencies = cursor.fetchall()
+        currencies_data = [
+            {
+                "currency_id": currency[0],
+                "currency_name": currency[1],
+                "amount_in_cash": currency[2]
+            }
+            for currency in currencies[1:]
+        ]
+
+    return render(request, 'exchange/cash_reserves.html', {'currencies': currencies_data})
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def add_currency_view(request):
+    if request.method == 'POST':
+        form = AddCurrencyForm(request.POST)
+        if form.is_valid():
+            currency_name = form.cleaned_data['currency_name']  # Получаем выбранную валюту
+            amount_in_cash = form.cleaned_data['amount_in_cash']
+
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO cash_reserves (currency_name, amount_in_cash)
+                    VALUES (%s, %s)
+                """, [currency_name, amount_in_cash])
+
+            messages.success(request, f"Валюта {currency_name} успешно добавлена в кассу!")
+            return redirect('exchange:cash_reserves')  # Перенаправляем на страницу с кассой
+        else:
+            messages.error(request, "Пожалуйста, заполните все поля.")
+    else:
+        form = AddCurrencyForm()
+
+    return render(request, 'exchange/add_currency_to_cash.html', {'form': form})
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def delete_currencies_view(request):
+    # Получаем список выбранных валют из POST-запроса
+    currency_ids = request.POST.getlist('currency_ids')
+
+    if currency_ids:
+        with connection.cursor() as cursor:
+            # Преобразуем список валют в строку, пригодную для SQL-запроса
+            placeholders = ', '.join(['%s'] * len(currency_ids))
+            cursor.execute(f"DELETE FROM cash_reserves WHERE currency_id IN ({placeholders})", currency_ids)
+        messages.success(request, "Выбранные валюты успешно удалены.")
+    else:
+        messages.warning(request, "Вы не выбрали ни одной валюты для удаления.")
+
+    return redirect('exchange:cash_reserves')
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def delete_rate(request):
+    # Проверяем права администратора
+    rates_ids = request.POST.getlist('rates_ids')
+
+    if rates_ids:
+        with connection.cursor() as cursor:
+            # Преобразуем список валют в строку, пригодную для SQL-запроса
+            placeholders = ', '.join(['%s'] * len(rates_ids))
+            cursor.execute(f"DELETE FROM exchange_rates WHERE rate_id IN ({placeholders})", rates_ids)
+        messages.success(request, "Выбранные курсы успешно удалены.")
+    else:
+        messages.warning(request, "Вы не выбрали ни одного курса для удаления.")
+
+    return redirect('exchange:rates')

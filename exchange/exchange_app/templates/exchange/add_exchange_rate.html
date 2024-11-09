@@ -11,10 +11,29 @@
     </form>
 
     {% if messages %}
-        <ul>
+        <ul class="messages">
             {% for message in messages %}
-                <li>{{ message }}</li>
+                <li {% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
             {% endfor %}
         </ul>
     {% endif %}
 {% endblock %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+    const useApiCheckbox = document.getElementById('use_api');
+    const rateToBaseInput = document.getElementById('id_rate_to_base');
+    const rateDateInput = document.getElementById('id_rate_date');
+
+    function toggleFields() {
+        const isApiSelected = useApiCheckbox.checked;
+        rateToBaseInput.disabled = isApiSelected;
+        rateDateInput.disabled = isApiSelected;
+    }
+
+    // Добавляем обработчик событий на изменение состояния чекбокса
+    useApiCheckbox.addEventListener('change', toggleFields);
+
+    // Инициализируем поля при загрузке страницы
+    toggleFields();
+});
+</script>

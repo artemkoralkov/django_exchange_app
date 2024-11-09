@@ -3,13 +3,15 @@
 
 {% block content %}
     <h2>Курсы валют</h2>
-  {% if messages %}
+    {% if messages %}
         <ul class="messages">
             {% for message in messages %}
                 <li {% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
             {% endfor %}
         </ul>
     {% endif %}
+<form action="{% url 'exchange:delete_rate' %}" method="post" style="display:inline;">
+                        {% csrf_token %}
     <table>
         <tr>
             <th>Валюта</th>
@@ -28,14 +30,14 @@
             {% if user.is_superuser %}
                 <td>{{ rate.amount_in_cash }}</td>
                 <td>
-            <!-- Форма для удаления курса -->
-                    <form action="{% url 'exchange:delete_rate' rate.rate_id %}" method="post" style="display:inline;">
-                        {% csrf_token %}
-                        <button type="submit" onclick="return confirm('Вы уверены, что хотите удалить этот курс?');"> 🗑️</button>
-                    </form>
+                    <input type="checkbox" name="rates_ids" value="{{ rate.rate_id }}">
                 </td>
             {% endif %}
         </tr>
         {% endfor %}
     </table>
+     {% if user.is_superuser %}
+        <button type="submit" onclick="return confirm('Вы уверены, что хотите удалить выбранные курсы?');"> Удалить</button>
+     {% endif %}
+</form>
 {% endblock %}

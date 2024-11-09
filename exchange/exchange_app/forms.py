@@ -40,26 +40,21 @@ class ExchangeForm(forms.Form):
 
 
 class AddExchangeRateForm(forms.Form):
-    currency_name = forms.CharField(max_length=30, required=True, label='Валюта')
+    currency = forms.ChoiceField(choices=[], required=True, label='Валюта')
+    use_api = forms.BooleanField(required=False, label="Получить курс из API")
     rate_to_base = forms.DecimalField(max_digits=10, decimal_places=4, required=True, label='Курс к базовой валюте')
-    amount_in_cash = forms.IntegerField(initial=0, max_value=10000000, required=False,
-                                        label='Количество валюты для пополнения')
     rate_date = forms.DateField(required=True, initial=timezone.now().date(),
                                 widget=forms.SelectDateWidget(years=range(2000, 2050)), label='Дата курса')
 
-
-class AddExchangeRateFromAPIForm(forms.Form):
-    currencies_from_api = [(i['Cur_ID'], requests.get(f'https://api.nbrb.by/exrates/currencies/{i['Cur_ID']}')
-                            .json()['Cur_Name']) for i in
-                           requests.get('https://api.nbrb.by/exrates/rates?periodicity=0')
-                           .json()]
-
-    currency_name = forms.ChoiceField(
-        choices=currencies_from_api,
-        label="Выберите валюту для добавления из API"
-    )
-    amount_in_cash = forms.IntegerField(initial=0, max_value=10000000, required=False,
-                                        label='Количество валюты для пополнения')
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT currency_id, currency_name FROM cash_reserves")
+            currency_choices = cursor.fetchall()
+        # Преобразуем множество валют в список и создаем выбор валют
+        self.fields['currency'].choices = [
+            (f"{currency[0]}:{currency[1]}", currency[1]) for currency in currency_choices[1:]
+        ]
 
 
 class AddCurrencyToCashForm(forms.Form):
@@ -67,14 +62,19 @@ class AddCurrencyToCashForm(forms.Form):
     with connection.cursor() as cursor:
         cursor.execute("SELECT currency_name FROM cash_reserves")
         currencies = cursor.fetchall()
-        currency_choices = [(currency[0], currency[0]) for currency in currencies]
+        currency_choices = [(currency[0], currency[0]) for currency in currencies[1:]]
     currency_name = forms.ChoiceField(choices=currency_choices, label="Выберите валюту")
-    amount_in_cash = forms.IntegerField(initial=0, max_value=10000000, required=False,
+    amount_in_cash = forms.IntegerField(min_value=1, max_value=10000000, required=True,
                                         label='Количество валюты для пополнения')
 
 
 class UserRegisterForm(UserCreationForm):
-
     class Meta:
         model = User
         fields = ['username', 'password1', 'password2']
+
+
+class AddCurrencyForm(forms.Form):
+    currency_name = forms.CharField(max_length=50, label='Название валюты')
+    amount_in_cash = forms.IntegerField(max_value=999999, label='Начальный баланс', min_value=0)
+

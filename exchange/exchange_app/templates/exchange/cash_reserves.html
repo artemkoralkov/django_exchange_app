@@ -1,0 +1,43 @@
+<!-- templates/exchange/cash_reserves.html -->
+{% extends './base.html' %}
+
+{% block content %}
+  <h1>Список валют</h1>
+   {% if messages %}
+        <ul class="messages">
+            {% for message in messages %}
+                 <li {% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+  <form method="post" action="{% url 'exchange:delete_currencies' %}">
+    {% csrf_token %}
+  <table>
+    <thead>
+      <tr>
+        <th>Название валюты</th>
+        <th>Баланс</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for currency in currencies %}
+        <tr>
+          <td>{{ currency.currency_name  }}</td>
+          <td>{{ currency.amount_in_cash  }}</td>
+        <td>
+          <input type="checkbox" name="currency_ids" value="{{ currency.currency_id }}">
+        </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="2">Нет валют в системе.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+
+  </table>
+    <a href="{% url 'exchange:add_currency' %}" class="btn btn-secondary">Добавить валюту</a>
+    <a href="{% url 'exchange:add_currency_to_cash' %}" class="btn btn-secondary">Пополнить баланс</a>
+         <button type="submit" class="btn btn-danger" onclick="return confirm('Вы уверены, что хотите удалить выбранные валюты?');">Удалить выбранные</button>
+  </form>
+{% endblock %}
