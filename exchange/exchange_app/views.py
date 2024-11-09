@@ -196,12 +196,11 @@ def exchange_view(request):
             amount = form.cleaned_data['amount']
             amount_to_get = form.cleaned_data['amount_to_get']
             today = timezone.now().date()
-            print(currency_from_id, currency_to_id)
             with connection.cursor() as cursor:
                 cursor.execute("SELECT amount_in_cash FROM cash_reserves WHERE currency_id = %s",
                                [currency_from_id])
                 available_cash = cursor.fetchone()[0]
-                rate_from = (1,) if currency_from_id == '0' else None
+                rate_from = (1,) if currency_from_id == '1' else None
                 if not rate_from:
                     cursor.execute("""
                           SELECT rate_to_base
@@ -211,7 +210,7 @@ def exchange_view(request):
                           FETCH FIRST 1 ROW ONLY
                       """, [currency_from_id])
                     rate_from = cursor.fetchone()
-                rate_to = (1,) if currency_to_id == '0' else None
+                rate_to = (1,) if currency_to_id == '1' else None
                 if not rate_to:
                     cursor.execute("""
                           SELECT rate_to_base
@@ -222,13 +221,12 @@ def exchange_view(request):
                       """, [currency_to_id])
                     rate_to = cursor.fetchone()
             # Проверка наличия курсов
-            print(1, rate_from, rate_to, currency_from_id, currency_to_id)
             if rate_from and rate_to:
                 rate_to_base_from = rate_from[0]
                 rate_to_base_to = rate_to[0]
                 amount_in_base = amount * rate_to_base_from
                 with connection.cursor() as cursor:
-                    currency_from = 'Белорусский рубль' if currency_from_id == 0 else None
+                    currency_from = 'Белорусский рубль' if currency_from_id == '1' else None
                     if not currency_from:
                         cursor.execute("""
                                SELECT currency_name
@@ -236,7 +234,7 @@ def exchange_view(request):
                                WHERE currency_id = %s
                            """, [currency_from_id])
                         currency_from = cursor.fetchone()[0]
-                    currency_to = 'Белорусский рубль' if currency_to_id == 0 else None
+                    currency_to = 'Белорусский рубль' if currency_to_id == '1' else None
                     if not currency_to:
                         cursor.execute("""
                                SELECT currency_name
@@ -245,7 +243,7 @@ def exchange_view(request):
                            """, [currency_to_id])
                         currency_to = cursor.fetchone()[0]
                 if amount_to_get:
-                    if amount_to_get >= available_cash:
+                    if amount_to_get >= available_cash and currency_from_id != '1':
                         messages.error(request,
                                        f"Недостаточно средств в кассе для обмена на {currency_to}. "
                                        f"Вы запрашиваете {amount_to_get}, а доступно только {available_cash}.")
@@ -259,14 +257,16 @@ def exchange_view(request):
                     change_in_base = amount_in_base - (exchanged_amount * rate_to_base_to)
 
                     # Проверка наличия достаточных средств в кассе
-                    if exchanged_amount > available_cash:
+                    if exchanged_amount > available_cash and currency_from_id != '1':
                         messages.error(request,
                                        f"Недостаточно средств в кассе для обмена на {currency_to}. Доступно: {available_cash}.")
                         return redirect('exchange:exchange_currency')
 
                 # Запись транзакции
+                if rate_to_base_to == 1:
+                    exchanged_amount = exchanged_amount + change_in_base
+                    change_in_base = 0
                 with connection.cursor() as cursor:
-                    print(['dsad', currency_from_id, currency_to_id])
                     cursor.execute("""INSERT INTO exchange_transactions (operator_id, currency_from_id, 
                     currency_to_id, amount, exchanged_amount, change_in_base,  transaction_date) VALUES (%s, %s, %s, 
                     %s, %s, %s, TO_DATE(%s, 'YYYY-MM-DD'))
@@ -275,9 +275,9 @@ def exchange_view(request):
                     exchanged_amount, change_in_base, today.strftime('%Y-%m-%d')])
 
                 # Уведомление об успешном обмене
-
-                messages.success(request, f"Вы обменяли {amount} {currency_from} на {exchanged_amount} {currency_to}. "
-                                          f"Сдача: {change_in_base:.2f} в базовой валюте.")
+                change_string = f"Сдача: {change_in_base:.2f} в базовой валюте." if change_in_base != 0 else ''
+                messages.success(request, f"Вы обменяли {amount} {currency_from} на {exchanged_amount:.2f} {currency_to}. "
+                                          + change_string)
                 return redirect('exchange:rates')
             else:
                 messages.error(request, "Курс обмена не найден.")
