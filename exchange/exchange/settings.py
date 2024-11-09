@@ -17,18 +17,16 @@ import dj_database_url
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY')
+SECRET_KEY = 'dsadasdasdsad'#os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = int(os.environ.get('DEBUG'))
+DEBUG = True  #int(os.environ.get('DEBUG'))
 
 ALLOWED_HOSTS = ['django-exchange-app.onrender.com', '127.0.0.1']
-
 
 # Application definition
 
@@ -73,25 +71,32 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'exchange.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 if os.environ.get('POSTGRES_URL'):
     # Replace the SQLite DATABASES configuration with PostgreSQL:
     DATABASES = {
         'default': dj_database_url.config(
-            default=os.environ.get('POSTGRES_URL'),
-            conn_max_age=600
+            default=os.environ.get('POSTGRES_URL')
         )
     }
 else:
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+        "default": {
+            "ENGINE": "django.db.backends.oracle",
+            "NAME": "xe",
+            "USER": "system",
+            "PASSWORD": "1234",
+            "HOST": "localhost",
+            "PORT": "1521",
         }
     }
-
+    # DATABASES = {
+    #     'default': {
+    #         'ENGINE': 'django.db.backends.sqlite3',
+    #         'NAME': BASE_DIR / 'db.sqlite3',
+    #     }
+    # }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -111,7 +116,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
@@ -122,7 +126,6 @@ TIME_ZONE = 'Europe/Minsk'
 USE_I18N = True
 
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/

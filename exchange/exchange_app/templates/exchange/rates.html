@@ -3,29 +3,41 @@
 
 {% block content %}
     <h2>Курсы валют</h2>
-  {% if messages %}
+    {% if messages %}
         <ul class="messages">
             {% for message in messages %}
                 <li {% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
             {% endfor %}
         </ul>
     {% endif %}
+<form action="{% url 'exchange:delete_rate' %}" method="post" style="display:inline;">
+                        {% csrf_token %}
     <table>
         <tr>
-            <th>Продажа</th>
-            <th>Покупка</th>
-            <th>Курс</th>
+            <th>Валюта</th>
+            <th>Стоимость</th>
             <th>Дата</th>
+            {% if user.is_superuser %}
+                <th>Осталось в кассе</th>
+                <th>Действия</th>
+            {% endif %}
         </tr>
         {% for rate in rates %}
         <tr>
-            <td>{{ rate.currency_from }}</td>
-            <td>{{ rate.currency_to }}</td>
-            <td>{{ rate.rate }}</td>
-            <td>{{ rate.date }}</td>
+            <td>{{ rate.currency_name }}</td>
+            <td>{{ rate.rate_to_base }}</td>
+            <td>{{ rate.rate_date|date:"d.m.Y" }}</td>
+            {% if user.is_superuser %}
+                <td>{{ rate.amount_in_cash }}</td>
+                <td>
+                    <input type="checkbox" name="rates_ids" value="{{ rate.rate_id }}">
+                </td>
+            {% endif %}
         </tr>
         {% endfor %}
     </table>
-    <a href="{% url 'exchange:exchange_currency' %}">Обменять валюту</a>
-    <a href="{% url 'exchange:logout' %}">Выйти</a>
+     {% if user.is_superuser %}
+        <button type="submit" onclick="return confirm('Вы уверены, что хотите удалить выбранные курсы?');"> Удалить</button>
+     {% endif %}
+</form>
 {% endblock %}
