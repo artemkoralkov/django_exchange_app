@@ -5,7 +5,6 @@ import requests
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.core.exceptions import PermissionDenied
 from django.db import connection, IntegrityError
 from django.shortcuts import render, redirect
 from django.utils import timezone
@@ -75,11 +74,9 @@ def add_exchange_rate(request):
     ]
     if request.method == 'POST':
         if form.is_valid():
-            print(1)
             currency_id, currency_name = form.cleaned_data['currency'].split(':')
             rate_date = form.cleaned_data['rate_date'].strftime('%Y-%m-%d')
             use_api = form.cleaned_data['use_api']
-            print(form.cleaned_data['currency'])
             if use_api:
                 rates = (requests.get('https://api.nbrb.by/exrates/rates?periodicity=0').json()
                          + requests.get('https://api.nbrb.by/exrates/rates?periodicity=1').json())
@@ -143,7 +140,7 @@ def exchange_view(request):
             today = timezone.now().date()
             with connection.cursor() as cursor:
                 cursor.execute("SELECT amount_in_cash FROM cash_reserves WHERE currency_id = %s",
-                               [currency_from_id])
+                               [currency_to_id])
                 available_cash = cursor.fetchone()[0]
                 rate_from = (1,) if currency_from_id == '1' else None
                 if not rate_from:
@@ -202,11 +199,11 @@ def exchange_view(request):
                     change_in_base = amount_in_base - (exchanged_amount * rate_to_base_to)
 
                     # Проверка наличия достаточных средств в кассе
-                    if exchanged_amount > available_cash and currency_from_id != '1':
-                        messages.error(request,
-                                       f"Недостаточно средств в кассе для обмена на {currency_to}."
-                                       f"Доступно: {available_cash}.")
-                        return redirect('exchange:exchange_currency')
+                if exchanged_amount > available_cash and currency_to_id != '1':
+                    messages.error(request,
+                                   f"Недостаточно средств в кассе для обмена на {currency_to}."
+                                   f"Доступно: {available_cash}.")
+                    return redirect('exchange:exchange_currency')
 
                 # Запись транзакции
                 if rate_to_base_to == 1:
