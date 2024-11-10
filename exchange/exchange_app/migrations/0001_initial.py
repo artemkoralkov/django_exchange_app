@@ -25,10 +25,6 @@ def create_exchange_tables(apps, schema_editor):
                 FOREIGN KEY (currency_id) REFERENCES cash_reserves(currency_id) ON DELETE CASCADE
             )
         """)
-        cursor.execute("""
-            ALTER TABLE exchange_rates
-            MODIFY rate_date DEFAULT SYSDATE
-        """)
 
         cursor.execute("""
             CREATE TABLE exchange_transactions (
