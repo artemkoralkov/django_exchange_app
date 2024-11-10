@@ -19,7 +19,7 @@
             <th>Дата</th>
             {% if user.is_superuser %}
                 <th>Осталось в кассе</th>
-                <th>Действия</th>
+                <th>Выделение</th>
             {% endif %}
         </tr>
         {% for rate in rates %}
@@ -37,7 +37,7 @@
         {% endfor %}
     </table>
      {% if user.is_superuser %}
-        <button type="submit" onclick="return confirm('Вы уверены, что хотите удалить выбранные курсы?');"> Удалить</button>
+        <button type="submit" class="btn btn-danger" onclick="return confirm('Вы уверены, что хотите удалить выбранные курсы?');"> Удалить</button>
      {% endif %}
 </form>
 {% endblock %}
