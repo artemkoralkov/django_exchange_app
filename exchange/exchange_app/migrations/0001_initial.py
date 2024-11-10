@@ -32,7 +32,7 @@ def create_exchange_tables(apps, schema_editor):
                 operator_id INTEGER  NOT NULL,
                 currency_from_id INTEGER ,
                 currency_to_id INTEGER ,
-                amount NUMBER(15, 2) NOT NULL,
+                amount NUMERIC(15, 2) NOT NULL,
                 exchanged_amount NUMERIC(15, 2) NOT NULL,
                 change_in_base NUMERIC(15, 2) NOT NULL,
                 transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
