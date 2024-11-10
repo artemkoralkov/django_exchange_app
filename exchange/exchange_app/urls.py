@@ -2,8 +2,8 @@
 from django.urls import path
 from .views import (login_view, logout_view, rates_view, index, add_exchange_rate,
                     exchange_view, transaction_history_view, add_currency_to_cash,
-                    delete_rate,
-                    register_view, cash_reserves_view, add_currency_view, delete_currencies_view)
+                    delete_rate,cash_reserves_view, add_currency_view,
+                    register_view, delete_currencies_view, delete_exchange)
 
 app_name = 'exchange_app'
 
@@ -21,4 +21,5 @@ urlpatterns = [
     path('cash_reserves/', cash_reserves_view, name='cash_reserves'),
     path('cash_reserves/add_currency/', add_currency_view, name='add_currency'),
     path('cash_reserves/delete/', delete_currencies_view, name='delete_currencies'),
+    path('exchange_history/delete_exchange', delete_exchange, name='delete_exchange')
 ]

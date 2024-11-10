@@ -17,6 +17,7 @@
       <tr>
         <th>Название валюты</th>
         <th>Баланс</th>
+        <th>Выделение</th>
       </tr>
     </thead>
     <tbody>
@@ -30,14 +31,14 @@
         </tr>
       {% empty %}
         <tr>
-          <td colspan="2">Нет валют в системе.</td>
+          <td colspan="3">Нет валют в системе.</td>
         </tr>
       {% endfor %}
     </tbody>
 
   </table>
-    <a href="{% url 'exchange:add_currency' %}" class="btn btn-secondary">Добавить валюту</a>
-    <a href="{% url 'exchange:add_currency_to_cash' %}" class="btn btn-secondary">Пополнить баланс</a>
+    <a href="{% url 'exchange:add_currency' %}" class="btn  btn-primary">Добавить валюту</a>
+    <a href="{% url 'exchange:add_currency_to_cash' %}" class="btn  btn-primary">Пополнить баланс</a>
          <button type="submit" class="btn btn-danger" onclick="return confirm('Вы уверены, что хотите удалить выбранные валюты?');">Удалить выбранные</button>
   </form>
 {% endblock %}

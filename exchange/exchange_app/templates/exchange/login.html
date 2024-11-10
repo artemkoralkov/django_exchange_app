@@ -12,10 +12,10 @@
         <button type="submit">Войти</button>
     </form>
     {% if messages %}
-        <div>
+        <ul class="messages">
             {% for message in messages %}
-             <p {% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</p>
+                 <li {% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
             {% endfor %}
-        </div>
+        </ul>
     {% endif %}
 {% endblock %}

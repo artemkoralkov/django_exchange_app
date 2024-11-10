@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import PermissionDenied
-from django.db import connection
+from django.db import connection, IntegrityError
 from django.shortcuts import render, redirect
 from django.utils import timezone
 
@@ -65,12 +65,21 @@ def rates_view(request):
 
 @user_passes_test(lambda u: u.is_superuser)
 def add_exchange_rate(request):
+    form = AddExchangeRateForm(request.POST or None)
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT currency_id, currency_name FROM cash_reserves")
+        currency_choices = cursor.fetchall()
+        # Преобразуем множество валют в список и создаем выбор валют
+    form.fields['currency'].choices = [
+        (f"{currency[0]}:{currency[1]}", currency[1]) for currency in currency_choices[1:]
+    ]
     if request.method == 'POST':
-        form = AddExchangeRateForm(request.POST)
         if form.is_valid():
+            print(1)
             currency_id, currency_name = form.cleaned_data['currency'].split(':')
             rate_date = form.cleaned_data['rate_date'].strftime('%Y-%m-%d')
             use_api = form.cleaned_data['use_api']
+            print(form.cleaned_data['currency'])
             if use_api:
                 rates = (requests.get('https://api.nbrb.by/exrates/rates?periodicity=0').json()
                          + requests.get('https://api.nbrb.by/exrates/rates?periodicity=1').json())
@@ -108,8 +117,6 @@ def add_exchange_rate(request):
             return redirect('exchange:rates')  # или на нужную вам страницу
         else:
             messages.error(request, "Пожалуйста, заполните все поля.")
-    else:
-        form = AddExchangeRateForm()
 
     return render(request, 'exchange/add_exchange_rate.html', {'form': form})
 
@@ -120,9 +127,14 @@ def exchange_view(request):
     if request.user.is_superuser:
         messages.error(request, "Только операторы могут обменивать валюту.")
         return redirect('exchange:rates')
-
+    form = ExchangeForm(request.POST or None)
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT currency_id, currency_name FROM cash_reserves")
+        currency_choices = cursor.fetchall()
+    # Преобразуем множество валют в список и создаем выбор валют
+    form.fields['currency_from'].choices = currency_choices
+    form.fields['currency_to'].choices = currency_choices
     if request.method == 'POST':
-        form = ExchangeForm(request.POST)
         if form.is_valid():
             currency_from_id = form.cleaned_data['currency_from']
             currency_to_id = form.cleaned_data['currency_to']
@@ -217,8 +229,6 @@ def exchange_view(request):
             else:
                 messages.error(request, "Курс обмена не найден.")
                 return redirect('exchange:exchange_currency')
-    else:
-        form = ExchangeForm()
 
     return render(request, 'exchange/exchange.html', {'form': form})
 
@@ -229,25 +239,41 @@ def transaction_history_view(request):
     # Если пользователь - администратор, показываем все транзакции
     if is_admin:
         with connection.cursor() as cursor:
-            cursor.execute("""SELECT  transaction_date, (SELECT currency_name FROM cash_reserves WHERE currency_id = 
-            currency_from_id) currency_from_name, (SELECT currency_name FROM cash_reserves WHERE currency_id = 
-            currency_to_id) currency_to_name, amount, exchanged_amount, change_in_base, username
-            FROM exchange_transactions t JOIN auth_user u ON t.operator_id = u.id ORDER BY transaction_date DESC
-            """)
-            transactions = cursor.fetchall()
+            cursor.execute("""SELECT  transaction_id, transaction_date, (SELECT currency_name FROM cash_reserves 
+            WHERE currency_id = currency_from_id) currency_from_name, (SELECT currency_name FROM cash_reserves WHERE 
+            currency_id = currency_to_id) currency_to_name, amount, exchanged_amount, change_in_base, username FROM 
+            exchange_transactions t JOIN auth_user u ON t.operator_id = u.id ORDER BY transaction_date DESC """)
+            transactions = [{
+                'transaction_id': t[0],
+                'transaction_date': t[1],
+                'currency_from_name': t[2],
+                'currency_to_name': t[3],
+                'amount': t[4],
+                'exchanged_amount': t[5],
+                'change_in_base': t[6],
+                'username': t[7],
+            } for t in cursor.fetchall()]
     else:
         # Если пользователь - оператор, показываем только его транзакции
         user_id = request.user.id
-        with connection.cursor() as cursor:
+        with (connection.cursor() as cursor):
             cursor.execute("""
-                SELECT  transaction_date, (SELECT currency_name FROM cash_reserves WHERE currency_id = 
+                SELECT  transaction_id, transaction_date, (SELECT currency_name FROM cash_reserves WHERE currency_id = 
                 currency_from_id) currency_from_name, (SELECT currency_name FROM cash_reserves WHERE currency_id = 
                 currency_to_id) currency_to_name, amount, exchanged_amount, change_in_base
                 FROM exchange_transactions 
                 WHERE operator_id = %s
                 ORDER BY transaction_date DESC
             """, [user_id])
-            transactions = cursor.fetchall()
+            transactions = [{
+                'transaction_id': t[0],
+                'transaction_date': t[1],
+                'currency_from_name': t[2],
+                'currency_to_name': t[3],
+                'amount': t[4],
+                'exchanged_amount': t[5],
+                'change_in_base': t[6],
+            } for t in cursor.fetchall()]
     context = {
         'transactions': transactions,
         'is_admin': is_admin,
@@ -255,13 +281,19 @@ def transaction_history_view(request):
     return render(request, 'exchange/history.html', context)
 
 
+@user_passes_test(lambda u: u.is_superuser)
 def add_currency_to_cash(request):
-    # Проверяем, является ли пользователь администратором
-    if not request.user.is_superuser:
-        raise PermissionDenied("Вы не имеете прав для выполнения этого действия.")
+    form = AddCurrencyToCashForm(request.POST or None)
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT currency_name FROM cash_reserves")
+        currencies = cursor.fetchall()
+        currency_choices = [(currency[0], currency[0]) for currency in currencies[1:]]
+
+    form.fields['currency_name'].choices = currency_choices
 
     if request.method == 'POST':
-        form = AddCurrencyToCashForm(request.POST)
+
         if form.is_valid():
             currency_name = form.cleaned_data['currency_name']  # Получаем выбранную валюту
             amount_in_cash = form.cleaned_data['amount_in_cash']
@@ -274,11 +306,9 @@ def add_currency_to_cash(request):
                 """, [amount_in_cash, currency_name])
 
             messages.success(request, f"Валюта {currency_name} успешно добавлена/обновлена в кассе!")
-            return redirect('exchange:rates')  # Перенаправляем на страницу с кассой
+            return redirect('exchange:cash_reserves')  # Перенаправляем на страницу с кассой
         else:
             messages.error(request, "Пожалуйста, заполните все поля.")
-    else:
-        form = AddCurrencyToCashForm()
 
     return render(request, 'exchange/add_currency_to_cash.html', {'form': form})
 
@@ -319,15 +349,18 @@ def add_currency_view(request):
         if form.is_valid():
             currency_name = form.cleaned_data['currency_name']  # Получаем выбранную валюту
             amount_in_cash = form.cleaned_data['amount_in_cash']
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        INSERT INTO cash_reserves (currency_name, amount_in_cash)
+                        VALUES (%s, %s)
+                    """, [currency_name, amount_in_cash])
 
-            with connection.cursor() as cursor:
-                cursor.execute("""
-                    INSERT INTO cash_reserves (currency_name, amount_in_cash)
-                    VALUES (%s, %s)
-                """, [currency_name, amount_in_cash])
-
-            messages.success(request, f"Валюта {currency_name} успешно добавлена в кассу!")
-            return redirect('exchange:cash_reserves')  # Перенаправляем на страницу с кассой
+                messages.success(request, f"Валюта {currency_name} успешно добавлена в кассу!")
+                return redirect('exchange:cash_reserves')  # Перенаправляем на страницу с кассой
+            except IntegrityError:
+                messages.error(request, "Валюта уже есть в базе")
+                return redirect('exchange:add_currency')
         else:
             messages.error(request, "Пожалуйста, заполните все поля.")
     else:
@@ -342,11 +375,15 @@ def delete_currencies_view(request):
     currency_ids = request.POST.getlist('currency_ids')
 
     if currency_ids:
-        with connection.cursor() as cursor:
-            # Преобразуем список валют в строку, пригодную для SQL-запроса
-            placeholders = ', '.join(['%s'] * len(currency_ids))
-            cursor.execute(f"DELETE FROM cash_reserves WHERE currency_id IN ({placeholders})", currency_ids)
-        messages.success(request, "Выбранные валюты успешно удалены.")
+        try:
+            with connection.cursor() as cursor:
+                # Преобразуем список валют в строку, пригодную для SQL-запроса
+                placeholders = ', '.join(['%s'] * len(currency_ids))
+                cursor.execute(f"DELETE FROM cash_reserves WHERE currency_id IN ({placeholders})", currency_ids)
+            messages.success(request, "Выбранные валюты успешно удалены.")
+        except IntegrityError:
+            messages.error(request, "Нельзя удалить валюты, которые участвовали в обмене.")
+            return redirect('exchange:cash_reserves')
     else:
         messages.warning(request, "Вы не выбрали ни одной валюты для удаления.")
 
@@ -368,3 +405,40 @@ def delete_rate(request):
         messages.warning(request, "Вы не выбрали ни одного курса для удаления.")
 
     return redirect('exchange:rates')
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def delete_currencies_view(request):
+    # Получаем список выбранных валют из POST-запроса
+    currency_ids = request.POST.getlist('currency_ids')
+
+    if currency_ids:
+        try:
+            with connection.cursor() as cursor:
+                # Преобразуем список валют в строку, пригодную для SQL-запроса
+                placeholders = ', '.join(['%s'] * len(currency_ids))
+                cursor.execute(f"DELETE FROM cash_reserves WHERE currency_id IN ({placeholders})", currency_ids)
+            messages.success(request, "Выбранные валюты успешно удалены.")
+        except IntegrityError:
+            messages.error(request, "Нельзя удалить валюты, которые участвовали в обмене.")
+            return redirect('exchange:cash_reserves')
+    else:
+        messages.warning(request, "Вы не выбрали ни одной валюты для удаления.")
+
+    return redirect('exchange:cash_reserves')
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def delete_exchange(request):
+    # Получаем список выбранных валют из POST-запроса
+    transactions_ids = request.POST.getlist('transactions_ids')
+    if transactions_ids:
+        with connection.cursor() as cursor:
+            # Преобразуем список валют в строку, пригодную для SQL-запроса
+            placeholders = ', '.join(['%s'] * len(transactions_ids))
+            cursor.execute(f"DELETE FROM exchange_transactions WHERE transaction_id IN ({placeholders})",
+                           transactions_ids)
+    else:
+        messages.warning(request, "Вы не выбрали ни одной транзакции.")
+    
+    return redirect('exchange:exchange_history')

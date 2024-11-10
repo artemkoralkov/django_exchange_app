@@ -41,8 +41,8 @@ def create_exchange_tables(apps, schema_editor):
                 change_in_base NUMBER(15, 2) NOT NULL,
                 transaction_date DATE DEFAULT SYSDATE,
                 FOREIGN KEY (operator_id) REFERENCES auth_user(id),
-                FOREIGN KEY (currency_from_id) REFERENCES cash_reserves(currency_id),
-                FOREIGN KEY (currency_to_id) REFERENCES cash_reserves(currency_id)
+                FOREIGN KEY (currency_from_id) REFERENCES cash_reserves(currency_id) ON DELETE CASCADE,
+                FOREIGN KEY (currency_to_id) REFERENCES cash_reserves(currency_id) ON DELETE CASCADE
             )
         """)
 

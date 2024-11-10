@@ -3,6 +3,8 @@
 
 {% block content %}
     <h2>История обменов</h2>
+    <form action="{% url 'exchange:delete_exchange' %}" method="post" style="display:inline;">
+                        {% csrf_token %}
     <table>
         <tr>
             <th>Дата</th>
@@ -14,21 +16,33 @@
             <th>Отдано</th>
             <th>Получено</th>
             <th>Сдача</th>
-        </tr>
-        {% for transaction in transactions %}
-        <tr>
-            <td>{{ transaction.0|date:"d.m.Y" }}</td>
-             {% if is_admin %}
-                <td>{{ transaction.6 }}</td>
+            {% if is_admin %}
+                <th>Выделение</th>
             {% endif %}
-            <td>{{ transaction.1 }}</td>
-            <td>{{ transaction.2 }}</td>
-            <td>{{ transaction.3 }}</td>
-            <td>{{ transaction.4 }}</td>
-            <td>{{ transaction.5 }}</td>
+        </tr>
+            {% for transaction in transactions %}
+        <tr>
+            <td>{{ transaction.transaction_date|date:"d.m.Y" }}</td>
+             {% if is_admin %}
+                <td>{{ transaction.username }}</td>
+            {% endif %}
+            <td>{{ transaction.currency_from_name }}</td>
+            <td>{{ transaction.currency_to_name }}</td>
+            <td>{{ transaction.amount }}</td>
+            <td>{{ transaction.exchanged_amount }}</td>
+            <td>{{ transaction.change_in_base }}</td>
+            {% if is_admin %}
+                <td>
+                    <input type="checkbox" name="transactions_ids" value="{{ transaction.transaction_id }}">
+                </td>
+            {% endif %}
         </tr>
         {% endfor %}
     </table>
+     {% if is_admin %}
+        <button type="submit" class="btn btn-danger" onclick="return confirm('Вы уверены, что хотите удалить выбранные транзакции?');"> Удалить</button>
+     {% endif %}
+</form>
     <a href="{% url 'exchange:rates' %}">Назад к курсам</a>
 {% endblock %}
 

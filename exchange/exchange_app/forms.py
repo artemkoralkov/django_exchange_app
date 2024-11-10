@@ -18,15 +18,6 @@ class ExchangeForm(forms.Form):
     amount_to_get = forms.IntegerField(label='Укажите сколько хотите получить,'
                                              ' если оставить пустым обменяется вся валюта', required=False)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT currency_id, currency_name FROM cash_reserves")
-            currency_choices = cursor.fetchall()
-        # Преобразуем множество валют в список и создаем выбор валют
-        self.fields['currency_from'].choices = currency_choices
-        self.fields['currency_to'].choices = currency_choices
-
     def clean(self):
         cleaned_data = super().clean()
         currency_from = cleaned_data.get('currency_from')
@@ -46,24 +37,10 @@ class AddExchangeRateForm(forms.Form):
     rate_date = forms.DateField(initial=timezone.now().date(), required=False,
                                 widget=forms.SelectDateWidget(years=range(2000, 2050)), label='Дата курса')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT currency_id, currency_name FROM cash_reserves")
-            currency_choices = cursor.fetchall()
-        # Преобразуем множество валют в список и создаем выбор валют
-        self.fields['currency'].choices = [
-            (f"{currency[0]}:{currency[1]}", currency[1]) for currency in currency_choices[1:]
-        ]
-
 
 class AddCurrencyToCashForm(forms.Form):
     # Получаем список валют из таблицы cash_reserves
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT currency_name FROM cash_reserves")
-        currencies = cursor.fetchall()
-        currency_choices = [(currency[0], currency[0]) for currency in currencies[1:]]
-    currency_name = forms.ChoiceField(choices=currency_choices, label="Выберите валюту")
+    currency_name = forms.ChoiceField(choices=[], label="Выберите валюту")
     amount_in_cash = forms.IntegerField(min_value=1, max_value=10000000, required=True,
                                         label='Количество валюты для пополнения')
 
