@@ -349,7 +349,7 @@ def add_currency_view(request):
         if form.is_valid():
             currency_name = form.cleaned_data['currency_name']  # Получаем выбранную валюту
             amount_in_cash = form.cleaned_data['amount_in_cash']
-            if currency_name not in (currencies + short_currencies.keys()):
+            if currency_name not in (currencies + list(short_currencies.keys())):
                 messages.error(request, "Валюта отсутствует в перечне валют Нацбанка")
                 return redirect('exchange:add_currency')
             if currency_name in short_currencies.keys():
