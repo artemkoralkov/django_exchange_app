@@ -341,15 +341,19 @@ def cash_reserves_view(request):
 
 @user_passes_test(lambda u: u.is_superuser)
 def add_currency_view(request):
-    currencies = [cur['Cur_Name'] for cur in requests.get('https://api.nbrb.by/exrates/currencies').json()]
+    currencies_from_api = requests.get('https://api.nbrb.by/exrates/currencies').json()
+    currencies = [cur['Cur_Name'] for cur in currencies_from_api]
+    short_currencies = {cur['Cur_Abbreviation']: cur['Cur_Name'] for cur in currencies_from_api}
     if request.method == 'POST':
         form = AddCurrencyForm(request.POST)
         if form.is_valid():
             currency_name = form.cleaned_data['currency_name']  # Получаем выбранную валюту
             amount_in_cash = form.cleaned_data['amount_in_cash']
-            if currency_name not in currencies:
+            if currency_name not in (currencies + list(short_currencies.keys())):
                 messages.error(request, "Валюта отсутствует в перечне валют Нацбанка")
                 return redirect('exchange:add_currency')
+            if currency_name in short_currencies.keys():
+                currency_name = short_currencies[currency_name]
             try:
                 with connection.cursor() as cursor:
                     cursor.execute("""
