@@ -14,6 +14,7 @@ from .utils import find_currency_id_by_name
 from .forms import ExchangeForm, AddExchangeRateForm, AddCurrencyToCashForm, \
     UserRegisterForm, AddCurrencyForm
 
+currencies_from_api = requests.get('https://api.nbrb.by/exrates/currencies').json()
 
 def index(request):
     return render(request, 'exchange/index.html')
@@ -80,7 +81,11 @@ def add_exchange_rate(request):
             if use_api:
                 rates = (requests.get('https://api.nbrb.by/exrates/rates?periodicity=0').json()
                          + requests.get('https://api.nbrb.by/exrates/rates?periodicity=1').json())
-                currency_id_from_api = find_currency_id_by_name(rates, currency_name)
+                currency_name_abbreviation = None
+                for cur in currencies_from_api:
+                    if cur.get("Cur_Name") == currency_name:
+                        currency_name_abbreviation = cur.get("Cur_Abbreviation")
+                currency_id_from_api = find_currency_id_by_name(rates, currency_name_abbreviation)
 
                 if not currency_id_from_api:
                     messages.error(request, "Такой валюты нет в API")
@@ -341,7 +346,6 @@ def cash_reserves_view(request):
 
 @user_passes_test(lambda u: u.is_superuser)
 def add_currency_view(request):
-    currencies_from_api = requests.get('https://api.nbrb.by/exrates/currencies').json()
     currencies = [cur['Cur_Name'] for cur in currencies_from_api]
     short_currencies = {cur['Cur_Abbreviation']: cur['Cur_Name'] for cur in currencies_from_api}
     if request.method == 'POST':
