@@ -2,6 +2,6 @@ from django.apps import AppConfig
 
 
 class ExchangeAppConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'exchange_app'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "exchange_app"
     verbose_name = "Обмен валют"
