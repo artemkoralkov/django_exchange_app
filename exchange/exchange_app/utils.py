@@ -363,9 +363,9 @@ class CurrencyExchangeService:
     @staticmethod
     def archive_currency(currency_id):
         with connection.cursor() as cursor:
-            cursor.execute("UPDATE cash_reserves SET is_archived = 1 WHERE currency_id = %s", [currency_id])
+            cursor.execute("UPDATE cash_reserves SET is_archived = TRUE WHERE currency_id = %s", [currency_id])
 
     @staticmethod
     def unarchived_currency(currency_id):
         with connection.cursor() as cursor:
-            cursor.execute("UPDATE cash_reserves SET is_archived = 0 WHERE currency_id = %s", [currency_id])
+            cursor.execute("UPDATE cash_reserves SET is_archived = FALSE WHERE currency_id = %s", [currency_id])
