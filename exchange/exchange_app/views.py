@@ -53,7 +53,7 @@ def add_exchange_rate(request):
     currency_choices = currency_exchange_service.get_currency()
     form.fields["currency"].choices = [
         (f"{currency[0]}:{currency[1]}", currency[1])
-        for currency in currency_choices[1:]
+        for currency in currency_choices[1:] if not currency[3]
     ]
     if request.method == "POST":
         if form.is_valid():
@@ -90,7 +90,8 @@ def exchange_view(request):
         messages.error(request, "Только операторы могут обменивать валюту.")
         return redirect("exchange:rates")
     form = ExchangeForm(request.POST or None)
-    currency_choices = [(i[0], i[1]) for i in currency_exchange_service.get_currency()]
+    currency_choices = [(currency[0], currency[1]) for currency in currency_exchange_service.get_currency() if
+                        not currency[3]]
     # Преобразуем множество валют в список и создаем выбор валют
     form.fields["currency_from"].choices = currency_choices
     form.fields["currency_to"].choices = currency_choices
@@ -156,10 +157,10 @@ def transaction_history_view(request):
 @user_passes_test(lambda u: u.is_superuser)
 def add_currency_to_cash(request):
     form = AddCurrencyToCashForm(request.POST or None)
-    currency_choices = [(currency[1], currency[1]) for currency in currency_exchange_service.get_currency()[1:]]
+    currency_choices = [(currency[1], currency[1]) for currency in currency_exchange_service.get_currency()[1:] if
+                        not currency[3]]
     form.fields["currency_name"].choices = currency_choices
     if request.method == "POST":
-
         if form.is_valid():
             currency_name = form.cleaned_data[
                 "currency_name"
@@ -197,6 +198,7 @@ def cash_reserves_view(request):
             "currency_id": currency[0],
             "currency_name": currency[1],
             "amount_in_cash": currency[2],
+            "is_archived": currency[3],
         }
         for currency in currency_exchange_service.get_currency()[1:]
     ]
@@ -236,20 +238,16 @@ def add_currency_view(request):
 
 
 @user_passes_test(lambda u: u.is_superuser)
-def delete_currencies_view(request):
+def delete_currencies_view(request, currency_id):
     # Получаем список выбранных валют из POST-запроса
-    currency_ids = request.POST.getlist("currency_ids")
-    if currency_ids:
-        try:
-            currency_exchange_service.delete_currencies(currency_ids)
-            messages.success(request, "Выбранные валюты успешно удалены.")
-        except IntegrityError:
-            messages.error(
-                request, "Нельзя удалить валюты, которые участвовали в обмене."
-            )
-            return redirect("exchange:cash_reserves")
-    else:
-        messages.warning(request, "Вы не выбрали ни одной валюты для удаления.")
+    try:
+        currency_exchange_service.delete_currencies(currency_id)
+        messages.success(request, "Валюта успешно удалена.")
+    except IntegrityError:
+        messages.error(
+            request, "Нельзя удалить валюты, которые участвовали в обмене."
+        )
+        return redirect("exchange:cash_reserves")
 
     return redirect("exchange:cash_reserves")
 
@@ -277,3 +275,17 @@ def delete_exchange(request):
         messages.warning(request, "Вы не выбрали ни одной транзакции.")
 
     return redirect("exchange:exchange_history")
+
+
+def archive_currency_view(request, currency_id):
+    if request.method == 'POST':
+        currency_exchange_service.archive_currency(currency_id)
+        messages.success(request, "Валюта успешно архивирована.")
+    return redirect('exchange:cash_reserves')
+
+
+def unarchived_currency_view(request, currency_id):
+    if request.method == 'POST':
+        currency_exchange_service.unarchived_currency(currency_id)
+        messages.success(request, "Валюта успешно восстановлена.")
+    return redirect('exchange:cash_reserves')

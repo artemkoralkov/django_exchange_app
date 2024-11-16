@@ -37,8 +37,9 @@
         {% endfor %}
     </table>
      {% if user.is_superuser %}
+        <a href="{% url 'exchange:add_exchange_rate' %}" class="btn  btn-primary">Добавить курс валют</a>
         <button type="submit" class="btn btn-danger" onclick="return confirm('Вы уверены, что хотите удалить выбранные курсы?');"> Удалить</button>
 </form>
-<a href="{% url 'exchange:add_exchange_rate' %}" class="btn  btn-primary">Добавить курс валют</a>
+
  {% endif %}
 {% endblock %}

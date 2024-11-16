@@ -26,8 +26,8 @@ class CurrencyExchangeService:
 
     def get_rate_from_api(self, currency_name):
 
-        # Получаем все доступные валюты и находим сокращение по названию
-        currencies_from_api = requests.get(f"{self.api_url}/currencies").json()
+        # Получаем все доступные валюты
+        currencies_from_api = self.get_all_currencies_from_api()
         current_date = datetime.now().date()
 
         # Фильтруем валюты по актуальной дате
@@ -121,7 +121,7 @@ class CurrencyExchangeService:
                 """
                 SELECT rate_id, currency_name, rate_to_base, rate_date, amount_in_cash
                 FROM exchange_rates er
-                JOIN cash_reserves cr ON er.currency_id = cr.currency_id
+                JOIN cash_reserves cr ON er.currency_id = cr.currency_id WHERE is_archived != 1
             """
             )
             rates = cursor.fetchall()
@@ -141,7 +141,7 @@ class CurrencyExchangeService:
     @staticmethod
     def get_currency():
         with connection.cursor() as cursor:
-            cursor.execute("SELECT currency_id, currency_name, amount_in_cash FROM cash_reserves")
+            cursor.execute("SELECT currency_id, currency_name, amount_in_cash, is_archived FROM cash_reserves")
             return cursor.fetchall()
 
     @staticmethod
@@ -304,13 +304,12 @@ class CurrencyExchangeService:
             ]
 
     @staticmethod
-    def delete_currencies(currency_ids):
+    def delete_currencies(currency_id):
         with connection.cursor() as cursor:
             # Преобразуем список валют в строку, пригодную для SQL-запроса
-            placeholders = ", ".join(["%s"] * len(currency_ids))
             cursor.execute(
-                f"DELETE FROM cash_reserves WHERE currency_id IN ({placeholders})",
-                currency_ids,
+                f"DELETE FROM cash_reserves WHERE currency_id = %s",
+                [currency_id],
             )
 
     @staticmethod
@@ -360,3 +359,13 @@ class CurrencyExchangeService:
                     today,
                 ],
             )
+
+    @staticmethod
+    def archive_currency(currency_id):
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE cash_reserves SET is_archived = 1 WHERE currency_id = %s", [currency_id])
+
+    @staticmethod
+    def unarchived_currency(currency_id):
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE cash_reserves SET is_archived = 0 WHERE currency_id = %s", [currency_id])
