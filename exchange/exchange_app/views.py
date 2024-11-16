@@ -1,6 +1,4 @@
 # exchange/views.py
-from decimal import Decimal
-
 import requests
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
@@ -8,8 +6,6 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import connection, IntegrityError
 from django.shortcuts import render, redirect
 from django.utils import timezone
-
-from .utils import find_currency_id_by_name
 
 from .forms import (
     ExchangeForm,
@@ -64,51 +60,20 @@ def add_exchange_rate(request):
             currency_id, currency_name = form.cleaned_data["currency"].split(":")
             rate_date = form.cleaned_data["rate_date"].strftime("%Y-%m-%d")
             use_api = form.cleaned_data["use_api"]
+            markup = form.cleaned_data["markup"]
             if use_api:
-                rates = (
-                    requests.get(
-                        "https://api.nbrb.by/exrates/rates?periodicity=0"
-                    ).json()
-                    + requests.get(
-                        "https://api.nbrb.by/exrates/rates?periodicity=1"
-                    ).json()
-                )
-                currency_id_from_api = find_currency_id_by_name(rates, currency_name)
-
-                if not currency_id_from_api:
-                    messages.error(request, "Такой валюты нет в API")
-                    return redirect("exchange:add_exchange_rate")
-
-                response = requests.get(
-                    f"https://api.nbrb.by/exrates/rates/{currency_id_from_api}"
-                )
-
-                if response.status_code == 200:
-                    rate_to_base = response.json().get("Cur_OfficialRate")
-                    cur_scale = response.json().get("Cur_Scale")
-                    rate_date = timezone.now().date().strftime("%Y-%m-%d")
-                    rate_to_base = Decimal(rate_to_base / cur_scale).quantize(
-                        Decimal("1.000")
-                    )
-                    if not rate_to_base:
-                        messages.error(request, "Не удалось получить курс из API.")
-                        return redirect("exchange:add_exchange_rate")
-                else:
-                    messages.error(request, "Ошибка при запросе к API.")
-                    return redirect("exchange:add_exchange_rate")
+                rate_to_base, error = currency_exchange_service.get_rate_from_api(currency_name)
+                if error:
+                    messages.error(request, error)
+                    return redirect('exchange:add_exchange_rate')
             else:
-                rate_to_base = form.cleaned_data["rate_to_base"]
+                rate_to_base = form.cleaned_data['rate_to_base']
             if not rate_to_base:
                 messages.error(request, "Введите курс валюты или добавьте его из API.")
                 return redirect("exchange:add_exchange_rate")
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                        INSERT INTO exchange_rates (currency_id, rate_to_base, rate_date)
-                        VALUES (%s, %s, TO_DATE(%s, 'YYYY-MM-DD'))
-                    """,
-                    [currency_id, rate_to_base, rate_date],
-                )
+
+            rate_to_base_with_markup = currency_exchange_service.apply_markup(rate_to_base, markup)
+            currency_exchange_service.add_exchange_rate(currency_id, rate_to_base_with_markup, rate_date)
 
             messages.success(request, f"Курс для {currency_name} успешно добавлен!")
             return redirect("exchange:rates")  # или на нужную вам страницу
@@ -125,7 +90,7 @@ def exchange_view(request):
         messages.error(request, "Только операторы могут обменивать валюту.")
         return redirect("exchange:rates")
     form = ExchangeForm(request.POST or None)
-    currency_choices = currency_exchange_service.get_currency()
+    currency_choices = [(i[0], i[1]) for i in currency_exchange_service.get_currency()]
     # Преобразуем множество валют в список и создаем выбор валют
     form.fields["currency_from"].choices = currency_choices
     form.fields["currency_to"].choices = currency_choices
@@ -134,99 +99,39 @@ def exchange_view(request):
             currency_from_id = form.cleaned_data["currency_from"]
             currency_to_id = form.cleaned_data["currency_to"]
             amount = form.cleaned_data["amount"]
-            amount_to_get = form.cleaned_data["amount_to_get"]
-            today = timezone.now().date()
+            amount_to_get = form.cleaned_data.get("amount_to_get", None)
 
-            available_cash = currency_exchange_service.get_currency_cash(currency_to_id)
-            rate_from = (
-                (1,)
-                if currency_from_id == "1"
-                else (currency_exchange_service.get_exchange_rate(currency_from_id))
+            # Расчёт обмена
+            exchanged_amount, change_in_base, error = currency_exchange_service.calculate_exchange(
+                currency_from_id, currency_to_id, amount, amount_to_get
             )
-            rate_to = (
-                (1,)
-                if currency_to_id == "1"
-                else currency_exchange_service.get_exchange_rate(currency_to_id)
-            )
-            if rate_from and rate_to:
-                rate_to_base_from = rate_from[0]
-                rate_to_base_to = rate_to[0]
-                amount_in_base = amount * rate_to_base_from
-                currency_from = (
-                    "Белорусский рубль"
-                    if currency_from_id == "1"
-                    else currency_exchange_service.get_currency_name(currency_from_id)
-                )
-                currency_to = (
-                    "Белорусский рубль"
-                    if currency_to_id == "1"
-                    else currency_exchange_service.get_currency_name(currency_to_id)
-                )
-                if amount_to_get:
-                    if amount_to_get >= available_cash and currency_from_id != "1":
-                        messages.error(
-                            request,
-                            f"Недостаточно средств в кассе для обмена на {currency_to}. "
-                            f"Вы запрашиваете {amount_to_get}, а доступно только {available_cash}.",
-                        )
-                        return redirect("exchange:exchange_currency")
-                    else:
-                        exchanged_amount = amount_to_get
-                        change_in_base = (
-                            amount_in_base - amount_to_get * rate_to_base_to
-                        )
-                else:
 
-                    exchanged_amount = int(amount_in_base / rate_to_base_to)
-                    change_in_base = amount_in_base - (
-                        exchanged_amount * rate_to_base_to
-                    )
-
-                    # Проверка наличия достаточных средств в кассе
-                if exchanged_amount > available_cash and currency_to_id != "1":
-                    messages.error(
-                        request,
-                        f"Недостаточно средств в кассе для обмена на {currency_to}."
-                        f"Доступно: {available_cash}.",
-                    )
-                    return redirect("exchange:exchange_currency")
-
-                # Запись транзакции
-                if rate_to_base_to == 1:
-                    exchanged_amount = exchanged_amount + change_in_base
-                    change_in_base = 0
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        """INSERT INTO exchange_transactions (operator_id, currency_from_id, 
-                    currency_to_id, amount, exchanged_amount, change_in_base,  transaction_date) VALUES (%s, %s, %s, 
-                    %s, %s, %s, TO_DATE(%s, 'YYYY-MM-DD'))
-                    """,
-                        [
-                            request.user.id,
-                            currency_from_id,
-                            currency_to_id,
-                            amount,
-                            exchanged_amount,
-                            change_in_base,
-                            today.strftime("%Y-%m-%d"),
-                        ],
-                    )
-
-                # Уведомление об успешном обмене
-                change_string = (
-                    f"Сдача: {change_in_base:.2f} в базовой валюте."
-                    if change_in_base != 0
-                    else ""
-                )
-                messages.success(
-                    request,
-                    f"Вы обменяли {amount} {currency_from} на {exchanged_amount:.2f} {currency_to}. "
-                    + change_string,
-                )
-                return redirect("exchange:rates")
-            else:
-                messages.error(request, "Курс обмена не найден.")
+            if error:
+                messages.error(request, error)
                 return redirect("exchange:exchange_currency")
+
+            # Запись транзакции
+            currency_exchange_service.record_transaction(
+                operator_id=request.user.id,
+                currency_from_id=currency_from_id,
+                currency_to_id=currency_to_id,
+                amount=amount,
+                exchanged_amount=exchanged_amount,
+                change_in_base=change_in_base,
+            )
+
+            # Уведомление об успешном обмене
+            change_string = (
+                f"Сдача: {change_in_base:.2f} в базовой валюте."
+                if change_in_base != 0 else ""
+            )
+            messages.success(
+                request,
+                f"Вы обменяли {amount} {currency_exchange_service.get_currency_name(currency_from_id)} на "
+                f"{exchanged_amount:.2f} {currency_exchange_service.get_currency_name(currency_to_id)}. "
+                + change_string
+            )
+            return redirect("exchange:rates")
 
     return render(request, "exchange/exchange.html", {"form": form})
 
@@ -303,42 +208,25 @@ def cash_reserves_view(request):
 
 @user_passes_test(lambda u: u.is_superuser)
 def add_currency_view(request):
-    currencies_from_api = requests.get("https://api.nbrb.by/exrates/currencies").json()
-    currencies = [cur["Cur_Name"] for cur in currencies_from_api]
-    short_currencies = {
-        cur["Cur_Abbreviation"]: cur["Cur_Name"] for cur in currencies_from_api
-    }
+    # Получаем данные через сервис
+    currency_choices, short_currencies = currency_exchange_service.get_currency_choices()
     if request.method == "POST":
         form = AddCurrencyForm(request.POST)
         if form.is_valid():
-            currency_name = form.cleaned_data[
-                "currency_name"
-            ]  # Получаем выбранную валюту
+            currency_name = form.cleaned_data["currency_name"]
             amount_in_cash = form.cleaned_data["amount_in_cash"]
-            if currency_name not in (currencies + list(short_currencies.keys())):
+            # Проверяем валидность валюты
+            if currency_name not in currency_choices and currency_name not in short_currencies:
                 messages.error(request, "Валюта отсутствует в перечне валют Нацбанка")
                 return redirect("exchange:add_currency")
-            if currency_name in short_currencies.keys():
-                currency_name = short_currencies[currency_name]
-            try:
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        INSERT INTO cash_reserves (currency_name, amount_in_cash)
-                        VALUES (%s, %s)
-                    """,
-                        [currency_name, amount_in_cash],
-                    )
-
-                messages.success(
-                    request, f"Валюта {currency_name} успешно добавлена в кассу!"
-                )
-                return redirect(
-                    "exchange:cash_reserves"
-                )  # Перенаправляем на страницу с кассой
-            except IntegrityError:
+            # Конвертируем сокращенное название в полное
+            currency_name = short_currencies.get(currency_name, currency_name)
+            # Добавляем валюту в базу через сервис
+            if currency_exchange_service.add_currency_to_cash(currency_name, amount_in_cash):
+                messages.success(request, f"Валюта {currency_name} успешно добавлена в кассу!")
+                return redirect("exchange:cash_reserves")
+            else:
                 messages.error(request, "Валюта уже есть в базе")
-                return redirect("exchange:add_currency")
         else:
             messages.error(request, "Пожалуйста, заполните все поля.")
     else:

@@ -47,6 +47,9 @@ class AddExchangeRateForm(forms.Form):
         widget=forms.SelectDateWidget(years=range(2000, 2050)),
         label="Дата курса",
     )
+    markup = forms.DecimalField(
+        label="Наценка (%)", required=False, max_digits=5, decimal_places=2, initial=0
+    )
 
 
 class AddCurrencyToCashForm(forms.Form):
