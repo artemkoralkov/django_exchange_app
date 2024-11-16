@@ -121,7 +121,7 @@ class CurrencyExchangeService:
                 """
                 SELECT rate_id, currency_name, rate_to_base, rate_date, amount_in_cash
                 FROM exchange_rates er
-                JOIN cash_reserves cr ON er.currency_id = cr.currency_id WHERE is_archived != 1
+                JOIN cash_reserves cr ON er.currency_id = cr.currency_id WHERE is_archived != TRUE
             """
             )
             rates = cursor.fetchall()
