@@ -134,7 +134,7 @@ class CurrencyExchangeService:
                 """
                 SELECT rate_id, currency_name, rate_to_base, rate_date, amount_in_cash
                 FROM exchange_rates er
-                JOIN cash_reserves cr ON er.currency_id = cr.currency_id WHERE is_archived != 1
+                JOIN cash_reserves cr ON er.currency_id = cr.currency_id WHERE is_archived != TRUE
             """
             )
             rates = cursor.fetchall()
@@ -509,7 +509,7 @@ class CurrencyExchangeService:
     def archive_currency(currency_id):
         with connection.cursor() as cursor:
             cursor.execute(
-                "UPDATE cash_reserves SET is_archived = 1 WHERE currency_id = %s",
+                "UPDATE cash_reserves SET is_archived = TRUE WHERE currency_id = %s",
                 [currency_id],
             )
 
@@ -517,6 +517,6 @@ class CurrencyExchangeService:
     def unarchived_currency(currency_id):
         with connection.cursor() as cursor:
             cursor.execute(
-                "UPDATE cash_reserves SET is_archived = 0 WHERE currency_id = %s",
+                "UPDATE cash_reserves SET is_archived = FALSE WHERE currency_id = %s",
                 [currency_id],
             )
