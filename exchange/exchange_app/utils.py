@@ -283,13 +283,14 @@ class CurrencyExchangeService:
         exchanged_amount,
         change_in_base,
     ):
+
         """Запись транзакции в базу данных."""
 
         cursor.execute(
             """
             INSERT INTO exchange_transactions (
-                operator_id, currency_from_id, currency_to_id, amount, exchanged_amount, change_in_base
-            ) VALUES (%s, %s, %s, %s, %s, %s)
+                operator_id, currency_from_id, currency_to_id, amount, exchanged_amount, change_in_base, transaction_date
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
             [
                 operator_id,
@@ -298,6 +299,7 @@ class CurrencyExchangeService:
                 amount,
                 exchanged_amount,
                 change_in_base,
+                timezone.now()
             ],
         )
 
