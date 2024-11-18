@@ -30,8 +30,6 @@ DEBUG = True  # int(os.environ.get('DEBUG'))
 ALLOWED_HOSTS = ["django-exchange-app.onrender.com", "127.0.0.1"]
 
 # Application definition
-AUTOCOMMIT = False
-ATOMIC_REQUESTS = True
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
