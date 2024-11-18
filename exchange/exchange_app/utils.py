@@ -305,7 +305,7 @@ class CurrencyExchangeService:
         self, operator_id, currency_from_id, currency_to_id, amount, amount_to_get
     ):
         """
-        Логика обмена валют через базовую валюту с использованием connection.commit и connection.rollback.
+        Логика обмена валют через базовую валюту.
         """
         with transaction.atomic():
             try:
@@ -352,12 +352,6 @@ class CurrencyExchangeService:
                     )
                     if error:
                         raise ValueError(error)
-
-                    # Проверка сдачи и кассы целевой валюты
-                    if change_in_base > self.get_currency_cash(cursor, "1"):
-                        raise ValueError(
-                            "Недостаточно базовой валюты для выдачи сдачи."
-                        )
 
                     # Запись транзакции: базовая валюта -> валюта 2
                     self.record_transaction(
