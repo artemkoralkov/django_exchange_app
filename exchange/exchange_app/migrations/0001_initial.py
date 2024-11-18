@@ -5,19 +5,25 @@ from django.db import migrations, connection
 
 def create_exchange_tables(apps, schema_editor):
     with connection.cursor() as cursor:
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE cash_reserves (
                 currency_id SERIAL PRIMARY KEY,
                 currency_name VARCHAR(40) UNIQUE NOT NULL,
-                amount_in_cash NUMERIC(15, 2) DEFAULT 0.00,
+                amount_in_cash NUMERIC(15, 2) DEFAULT 0.00 CHECK(amount_in_cash >= 0),
                 is_archived BOOLEAN DEFAULT FALSE
     )
-        """)
-        cursor.execute("""
+        """
+        )
+        cursor.execute(
+            """
             INSERT INTO cash_reserves (currency_name, amount_in_cash)
             VALUES (%s, %s)
-        """, ['Белорусский рубль', 1])
-        cursor.execute("""
+        """,
+            ["Белорусский рубль", 1000000],
+        )
+        cursor.execute(
+            """
             CREATE TABLE exchange_rates (
                 rate_id SERIAL PRIMARY KEY,
                 currency_id INTEGER,
@@ -25,9 +31,11 @@ def create_exchange_tables(apps, schema_editor):
                 rate_date DATE NOT NULL DEFAULT CURRENT_DATE,
                 FOREIGN KEY (currency_id) REFERENCES cash_reserves(currency_id) ON DELETE CASCADE
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE exchange_transactions (
                 transaction_id SERIAL PRIMARY KEY,
                 operator_id INTEGER  NOT NULL,
@@ -41,43 +49,40 @@ def create_exchange_tables(apps, schema_editor):
                 FOREIGN KEY (currency_from_id) REFERENCES cash_reserves(currency_id),
                 FOREIGN KEY (currency_to_id) REFERENCES cash_reserves(currency_id)
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
-            CREATE OR REPLACE FUNCTION update_cash_after_exchange() RETURNS TRIGGER AS $$
-    DECLARE
-        v_amount_in_cash NUMERIC(15, 2);
-    BEGIN
-        IF NEW.currency_from_id != 1 THEN
-            SELECT amount_in_cash INTO v_amount_in_cash
-            FROM cash_reserves
-            WHERE currency_id = NEW.currency_from_id;
-
-            UPDATE cash_reserves
-            SET amount_in_cash = amount_in_cash + NEW.amount
-            WHERE currency_id = NEW.currency_from_id;
-        END IF;
-
-        IF NEW.currency_to_id != 1 THEN
-            SELECT amount_in_cash INTO v_amount_in_cash
-            FROM cash_reserves
-            WHERE currency_id = NEW.currency_to_id;
-
-            UPDATE cash_reserves
-            SET amount_in_cash = amount_in_cash - NEW.exchanged_amount
-            WHERE currency_id = NEW.currency_to_id;
-        END IF;
-
-        RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql;
-        """)
-        cursor.execute("""
+        cursor.execute(
+            """
+            CREATE OR REPLACE FUNCTION update_cash_after_exchange()
+            RETURNS TRIGGER AS $$
+            BEGIN
+            
+                UPDATE cash_reserves
+                SET amount_in_cash = amount_in_cash + NEW.amount
+                WHERE currency_id = NEW.currency_from_id;
+                
+                UPDATE cash_reserves
+                SET amount_in_cash = amount_in_cash - NEW.exchanged_amount
+                WHERE currency_id = NEW.currency_to_id;
+            
+                UPDATE cash_reserves
+                SET amount_in_cash = amount_in_cash - NEW.change_in_base
+                WHERE currency_id = 1;
+            
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        """
+        )
+        cursor.execute(
+            """
             CREATE TRIGGER update_cash_after_exchange
             AFTER INSERT ON exchange_transactions
             FOR EACH ROW
             EXECUTE FUNCTION update_cash_after_exchange();
-        """)
+        """
+        )
 
 
 def reverse_create_exchange_tables(apps, schema_editor):
