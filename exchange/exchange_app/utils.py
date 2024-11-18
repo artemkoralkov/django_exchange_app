@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import requests
@@ -469,7 +469,7 @@ class CurrencyExchangeService:
             return [
                 {
                     "transaction_id": t[0],
-                    "transaction_date": t[1],
+                    "transaction_date": t[1] + timedelta(hours=3),
                     "currency_from_name": t[2],
                     "currency_to_name": t[3],
                     "amount": t[4],
