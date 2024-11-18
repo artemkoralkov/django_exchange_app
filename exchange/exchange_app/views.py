@@ -4,6 +4,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import IntegrityError
 from django.shortcuts import render, redirect
+from django.utils import timezone
 
 from .forms import (
     ExchangeForm,
@@ -42,7 +43,8 @@ def logout_view(request):
 @login_required(login_url="/exchange/accounts/login/")
 def rates_view(request):
     rates_data = currency_exchange_service.get_rates()
-    return render(request, "exchange/rates.html", {"rates": rates_data})
+
+    return render(request, "exchange/rates.html", {"rates": rates_data, "time": timezone.now()})
 
 
 @user_passes_test(lambda u: u.is_superuser)

@@ -44,7 +44,7 @@ def create_exchange_tables(apps, schema_editor):
                 amount NUMERIC(15, 2) NOT NULL,
                 exchanged_amount NUMERIC(15, 2) NOT NULL,
                 change_in_base NUMERIC(15, 2) NOT NULL,
-                transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                transaction_date TIMESTAMP,
                 FOREIGN KEY (operator_id) REFERENCES auth_user(id),
                 FOREIGN KEY (currency_from_id) REFERENCES cash_reserves(currency_id),
                 FOREIGN KEY (currency_to_id) REFERENCES cash_reserves(currency_id)
