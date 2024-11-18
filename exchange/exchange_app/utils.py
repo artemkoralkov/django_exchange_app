@@ -9,6 +9,8 @@ from django.utils import timezone
 class CurrencyExchangeService:
     def __init__(self):
         self.api_url = "https://api.nbrb.by/exrates"
+        with connection.cursor() as cursor:
+            cursor.execute("SET TIMEZONE TO 'Europe/Moscow';")
 
     @staticmethod
     def apply_markup(rate, markup):
