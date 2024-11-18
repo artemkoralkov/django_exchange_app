@@ -22,7 +22,7 @@
         </tr>
             {% for transaction in transactions %}
         <tr>
-            <td>{{ transaction.transaction_date|date:"d.m.Y" }}</td>
+            <td>{{ transaction.transaction_date }}</td>
              {% if is_admin %}
                 <td>{{ transaction.username }}</td>
             {% endif %}

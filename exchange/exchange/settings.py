@@ -30,7 +30,8 @@ DEBUG = True  # int(os.environ.get('DEBUG'))
 ALLOWED_HOSTS = ["django-exchange-app.onrender.com", "127.0.0.1"]
 
 # Application definition
-
+AUTOCOMMIT = False
+ATOMIC_REQUESTS = True
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -88,6 +89,7 @@ else:
             "PASSWORD": "1234",
             "HOST": "localhost",
             "PORT": "1521",
+
         }
     }
     # DATABASES = {
@@ -142,3 +144,32 @@ if not DEBUG:
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGOUT_REDIRECT_URL = "/exchange"
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django.db.backends': {
+            'level': 'DEBUG',
+            'handlers': ['console'],
+            'propagate': False,
+        },
+    },
+}

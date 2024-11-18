@@ -53,7 +53,8 @@ def add_exchange_rate(request):
     currency_choices = currency_exchange_service.get_currency()
     form.fields["currency"].choices = [
         (f"{currency[0]}:{currency[1]}", currency[1])
-        for currency in currency_choices[1:] if not currency[3]
+        for currency in currency_choices[1:]
+        if not currency[3]
     ]
     if request.method == "POST":
         if form.is_valid():
@@ -62,18 +63,24 @@ def add_exchange_rate(request):
             use_api = form.cleaned_data["use_api"]
             markup = form.cleaned_data["markup"]
             if use_api:
-                rate_to_base, error = currency_exchange_service.get_rate_from_api(currency_name)
+                rate_to_base, error = currency_exchange_service.get_rate_from_api(
+                    currency_name
+                )
                 if error:
                     messages.error(request, error)
-                    return redirect('exchange:add_exchange_rate')
+                    return redirect("exchange:add_exchange_rate")
             else:
-                rate_to_base = form.cleaned_data['rate_to_base']
+                rate_to_base = form.cleaned_data["rate_to_base"]
             if not rate_to_base:
                 messages.error(request, "Введите курс валюты или добавьте его из API.")
                 return redirect("exchange:add_exchange_rate")
 
-            rate_to_base_with_markup = currency_exchange_service.apply_markup(rate_to_base, markup)
-            currency_exchange_service.add_exchange_rate(currency_id, rate_to_base_with_markup, rate_date)
+            rate_to_base_with_markup = currency_exchange_service.apply_markup(
+                rate_to_base, markup
+            )
+            currency_exchange_service.add_exchange_rate(
+                currency_id, rate_to_base_with_markup, rate_date
+            )
 
             messages.success(request, f"Курс для {currency_name} успешно добавлен!")
             return redirect("exchange:rates")  # или на нужную вам страницу
@@ -90,8 +97,11 @@ def exchange_view(request):
         messages.error(request, "Только операторы могут обменивать валюту.")
         return redirect("exchange:rates")
     form = ExchangeForm(request.POST or None)
-    currency_choices = [(currency[0], currency[1]) for currency in currency_exchange_service.get_currency() if
-                        not currency[3]]
+    currency_choices = [
+        (currency[0], currency[1])
+        for currency in currency_exchange_service.get_currency()
+        if not currency[3]
+    ]
     # Преобразуем множество валют в список и создаем выбор валют
     form.fields["currency_from"].choices = currency_choices
     form.fields["currency_to"].choices = currency_choices
@@ -102,36 +112,30 @@ def exchange_view(request):
             amount = form.cleaned_data["amount"]
             amount_to_get = form.cleaned_data.get("amount_to_get", None)
 
-            # Расчёт обмена
-            exchanged_amount, change_in_base, error = currency_exchange_service.calculate_exchange(
-                currency_from_id, currency_to_id, amount, amount_to_get
+            exchanged_amount, change_in_base, error = (
+                currency_exchange_service.exchange_currency_with_transaction(
+                    operator_id=request.user.id,
+                    currency_from_id=currency_from_id,
+                    currency_to_id=currency_to_id,
+                    amount=amount,
+                    amount_to_get=amount_to_get,
+                )
             )
 
             if error:
                 messages.error(request, error)
-                return redirect("exchange:exchange_currency")
-
-            # Запись транзакции
-            currency_exchange_service.record_transaction(
-                operator_id=request.user.id,
-                currency_from_id=currency_from_id,
-                currency_to_id=currency_to_id,
-                amount=amount,
-                exchanged_amount=exchanged_amount,
-                change_in_base=change_in_base,
-            )
-
-            # Уведомление об успешном обмене
-            change_string = (
-                f"Сдача: {change_in_base:.2f} в базовой валюте."
-                if change_in_base != 0 else ""
-            )
-            messages.success(
-                request,
-                f"Вы обменяли {amount} {currency_exchange_service.get_currency_name(currency_from_id)} на "
-                f"{exchanged_amount:.2f} {currency_exchange_service.get_currency_name(currency_to_id)}. "
-                + change_string
-            )
+            else:
+                change_string = (
+                    f"Сдача: {change_in_base:.2f} в базовой валюте."
+                    if change_in_base != 0
+                    else ""
+                )
+                messages.success(
+                    request,
+                    f"Вы обменяли {amount} {currency_exchange_service.get_currency_name(currency_from_id)} на "
+                    f"{exchanged_amount:.2f} {currency_exchange_service.get_currency_name(currency_to_id)}. "
+                    + change_string,
+                )
             return redirect("exchange:rates")
 
     return render(request, "exchange/exchange.html", {"form": form})
@@ -157,8 +161,11 @@ def transaction_history_view(request):
 @user_passes_test(lambda u: u.is_superuser)
 def add_currency_to_cash(request):
     form = AddCurrencyToCashForm(request.POST or None)
-    currency_choices = [(currency[1], currency[1]) for currency in currency_exchange_service.get_currency()[1:] if
-                        not currency[3]]
+    currency_choices = [
+        (currency[1], currency[1])
+        for currency in currency_exchange_service.get_currency()
+        if not currency[3]
+    ]
     form.fields["currency_name"].choices = currency_choices
     if request.method == "POST":
         if form.is_valid():
@@ -166,7 +173,9 @@ def add_currency_to_cash(request):
                 "currency_name"
             ]  # Получаем выбранную валюту
             amount_in_cash = form.cleaned_data["amount_in_cash"]
-            currency_exchange_service.update_currency_cash(amount_in_cash, currency_name)
+            currency_exchange_service.update_currency_cash(
+                amount_in_cash, currency_name
+            )
             messages.success(
                 request, f"Валюта {currency_name} успешно добавлена/обновлена в кассе!"
             )
@@ -200,7 +209,7 @@ def cash_reserves_view(request):
             "amount_in_cash": currency[2],
             "is_archived": currency[3],
         }
-        for currency in currency_exchange_service.get_currency()[1:]
+        for currency in currency_exchange_service.get_currency()
     ]
 
     return render(
@@ -211,21 +220,30 @@ def cash_reserves_view(request):
 @user_passes_test(lambda u: u.is_superuser)
 def add_currency_view(request):
     # Получаем данные через сервис
-    currency_choices, short_currencies = currency_exchange_service.get_currency_choices()
+    currency_choices, short_currencies = (
+        currency_exchange_service.get_currency_choices()
+    )
     if request.method == "POST":
         form = AddCurrencyForm(request.POST)
         if form.is_valid():
             currency_name = form.cleaned_data["currency_name"]
             amount_in_cash = form.cleaned_data["amount_in_cash"]
             # Проверяем валидность валюты
-            if currency_name not in currency_choices and currency_name not in short_currencies:
+            if (
+                currency_name not in currency_choices
+                and currency_name not in short_currencies
+            ):
                 messages.error(request, "Валюта отсутствует в перечне валют Нацбанка")
                 return redirect("exchange:add_currency")
             # Конвертируем сокращенное название в полное
             currency_name = short_currencies.get(currency_name, currency_name)
             # Добавляем валюту в базу через сервис
-            if currency_exchange_service.add_currency_to_cash(currency_name, amount_in_cash):
-                messages.success(request, f"Валюта {currency_name} успешно добавлена в кассу!")
+            if currency_exchange_service.add_currency_to_cash(
+                currency_name, amount_in_cash
+            ):
+                messages.success(
+                    request, f"Валюта {currency_name} успешно добавлена в кассу!"
+                )
                 return redirect("exchange:cash_reserves")
             else:
                 messages.error(request, "Валюта уже есть в базе")
@@ -240,14 +258,16 @@ def add_currency_view(request):
 @user_passes_test(lambda u: u.is_superuser)
 def delete_currencies_view(request, currency_id):
     # Получаем список выбранных валют из POST-запроса
-    try:
-        currency_exchange_service.delete_currencies(currency_id)
-        messages.success(request, "Валюта успешно удалена.")
-    except IntegrityError:
-        messages.error(
-            request, "Нельзя удалить валюты, которые участвовали в обмене."
-        )
-        return redirect("exchange:cash_reserves")
+    if currency_id == 1:
+        messages.error(request, "Невозможно удалить базовую валюту.")
+    else:
+        try:
+            currency_exchange_service.delete_currencies(currency_id)
+            messages.success(request, "Валюта успешно удалена.")
+        except IntegrityError:
+            messages.error(
+                request, "Нельзя удалить валюты, которые участвовали в обмене."
+            )
 
     return redirect("exchange:cash_reserves")
 
@@ -278,14 +298,16 @@ def delete_exchange(request):
 
 
 def archive_currency_view(request, currency_id):
-    if request.method == 'POST':
+    if currency_id == 1:
+        messages.error(request, "Невозможно архивировать базовую валюту.")
+    else:
         currency_exchange_service.archive_currency(currency_id)
         messages.success(request, "Валюта успешно архивирована.")
-    return redirect('exchange:cash_reserves')
+    return redirect("exchange:cash_reserves")
 
 
 def unarchived_currency_view(request, currency_id):
-    if request.method == 'POST':
+    if request.method == "POST":
         currency_exchange_service.unarchived_currency(currency_id)
         messages.success(request, "Валюта успешно восстановлена.")
-    return redirect('exchange:cash_reserves')
+    return redirect("exchange:cash_reserves")

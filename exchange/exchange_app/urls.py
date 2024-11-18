@@ -14,7 +14,9 @@ from .views import (
     add_currency_view,
     register_view,
     delete_currencies_view,
-    delete_exchange, archive_currency_view, unarchived_currency_view,
+    delete_exchange,
+    archive_currency_view,
+    unarchived_currency_view,
 )
 
 app_name = "exchange_app"
@@ -33,7 +35,19 @@ urlpatterns = [
     path("register/", register_view, name="register"),
     path("cash_reserves/", cash_reserves_view, name="cash_reserves"),
     path("cash_reserves/add_currency/", add_currency_view, name="add_currency"),
-    path("cash_reserves/delete/<int:currency_id>/", delete_currencies_view, name="delete_currencies"),
-    path('cash_reserves/archive/<int:currency_id>/', archive_currency_view, name='archive_currency'),
-    path('cash_reserves/unarchived/<int:currency_id>/', unarchived_currency_view, name='unarchived_currency'),
+    path(
+        "cash_reserves/delete/<int:currency_id>/",
+        delete_currencies_view,
+        name="delete_currencies",
+    ),
+    path(
+        "cash_reserves/archive/<int:currency_id>/",
+        archive_currency_view,
+        name="archive_currency",
+    ),
+    path(
+        "cash_reserves/unarchived/<int:currency_id>/",
+        unarchived_currency_view,
+        name="unarchived_currency",
+    ),
 ]
